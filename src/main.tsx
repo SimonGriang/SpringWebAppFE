@@ -1,18 +1,9 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
-import App from "./App";
-import { MantineProvider } from "@mantine/core";
-import { TenantProvider } from "./tenant/TenantProvider";
-import { AuthProvider } from "./auth/AuthProvider";
+import { App } from "./app/App";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    <AuthProvider>
-      <TenantProvider>
-        <MantineProvider>
-          <App />
-        </MantineProvider>
-      </TenantProvider>
-    </AuthProvider>
+    <App />
   </React.StrictMode>
 );

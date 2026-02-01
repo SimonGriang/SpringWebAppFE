@@ -1,42 +1,69 @@
-import { useState, useContext } from "react";
-import { TextInput, Button, Paper, Title } from "@mantine/core";
+import { useContext, useState } from "react";
 import { AuthContext } from "../auth/AuthContext";
-
-// Fake Backend-Login
-const fakeLogin = async (username: string, password: string) => {
-  // simuliert JWT von Backend
-  return {
-    token: "FAKE.JWT.TOKEN",
-    payload: {
-      employeeId: "123",
-      companyId: "456",
-      companyKey: "acme",
-      permissions: ["USER_READ"],
-    },
-  };
-};
+import { decodeJwt } from "../auth/jwtDecode";
 
 export const LoginPage: React.FC = () => {
   const { login } = useContext(AuthContext);
-  const [username, setUsername] = useState("");
+  const [employeeNumber, setEmployeeNumber] = useState("");
   const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const { token, payload } = await fakeLogin(username, password);
-    login(token, payload);
+    setError("");
+    setSuccess(false);
+
+    try {
+      const response = await fetch("/backend/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          employeeNumber,
+          password,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Login fehlgeschlagen");
+      }
+
+      const data = await response.json();
+      const token = data.token;
+      const payload = decodeJwt(token);
+
+      // AuthContext aktualisieren
+      login(token, payload);
+
+      setSuccess(true);
+    } catch (err: any) {
+      setError(err.message);
+    }
   };
 
   return (
-    <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100vh" }}>
-      <Paper p="xl" shadow="md" style={{ width: 300 }}>
-        <Title order={3} mb="md">Login</Title>
-        <form onSubmit={handleSubmit}>
-          <TextInput label="Username" value={username} onChange={(e) => setUsername(e.currentTarget.value)} required mb="sm" />
-          <TextInput label="Password" type="password" value={password} onChange={(e) => setPassword(e.currentTarget.value)} required mb="sm" />
-          <Button type="submit" fullWidth mt="md">Login</Button>
-        </form>
-      </Paper>
+    <div style={{ maxWidth: 400, margin: "auto", padding: 20 }}>
+      <h2>Login</h2>
+      <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        <input
+          type="text"
+          placeholder="Mitarbeiter-Nummer"
+          value={employeeNumber}
+          onChange={(e) => setEmployeeNumber(e.target.value)}
+          required
+        />
+        <input
+          type="password"
+          placeholder="Passwort"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          required
+        />
+        <button type="submit">Login</button>
+      </form>
+
+      {error && <p style={{ color: "red" }}>{error}</p>}
+      {success && <p style={{ color: "green" }}>Login erfolgreich! ✅</p>}
     </div>
   );
 };
