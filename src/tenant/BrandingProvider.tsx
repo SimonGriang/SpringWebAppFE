@@ -30,7 +30,7 @@ export const BrandingProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     if (!token) return;
     setLoading(true);
     try {
-      const data = await apiClient("/api/tenant/branding");
+      const data = await apiClient("/backend/tenant/branding");
       setBranding(data);
     } catch (err) {
       console.error("Failed to load branding", err);

@@ -1,6 +1,9 @@
 export type JwtPayload = {
-  employeeId: string;
+  sub: string;
+  employeeFirstname: string;
+  employeeSurname: string;
   companyId: string;
-  companyKey: string;
   permissions: string[];
+  iat: number;
+  exp: number;
 };

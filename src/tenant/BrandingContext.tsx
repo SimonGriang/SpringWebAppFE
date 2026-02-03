@@ -1,4 +1,4 @@
-import { createContext } from "react";
+import { createContext, useContext } from "react";
 
 export type Branding = {
   primaryColor: string;
@@ -19,3 +19,5 @@ export const BrandingContext = createContext<BrandingContextType>({
   loading: false,
   reloadBranding: async () => {},
 });
+
+export const useBranding = () => useContext(BrandingContext);
