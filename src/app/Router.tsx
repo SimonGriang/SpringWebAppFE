@@ -4,6 +4,10 @@ import { useAuth } from "../auth/AuthContext";
 import { LoginPage } from "../pages/LoginPage";
 import { DashboardPage } from "../pages/DashboardPage";
 import { TimeTrackingPage } from "../pages/TimeTrackingPage";
+import { DefaultLayout } from "../components/layout/DefaultLayout";
+import { MinimalLayout } from "../components/layout/MinimalLayout";
+import { BrandingProvider } from "../tenant/BrandingProvider";
+//import { PublicWebLayout } from "../components/layout/PublicWebLayout";
 
 const ProtectedRoute = ({ children }: { children: JSX.Element }) => {
   const { token } = useAuth();
@@ -16,13 +20,45 @@ const ProtectedRoute = ({ children }: { children: JSX.Element }) => {
   export const Router = () => (
   <BrowserRouter>
     <Routes>
-      <Route path="/login" element={<LoginPage />} />
+      <Route path="/" 
+      element={
+          <BrandingProvider mode="standard">
+            <MinimalLayout>
+              <LoginPage />
+            </MinimalLayout>
+          </BrandingProvider>
+        } 
+      />
+
+      <Route path="/login" 
+        element={
+          <BrandingProvider mode="standard">      
+            <MinimalLayout>
+              <LoginPage />
+            </MinimalLayout>
+          </BrandingProvider>
+        } 
+      />
+
+      <Route path="/login2" 
+        element={
+          <BrandingProvider mode="standard">      
+            <MinimalLayout>
+              <LoginPage2 />
+            </MinimalLayout>
+          </BrandingProvider>
+        } 
+      />
 
       <Route
-        path="/"
+        path="/dashboard"
         element={
           <ProtectedRoute>
-            <DashboardPage />
+            <BrandingProvider mode="tenant">
+              <DefaultLayout>
+                <DashboardPage />
+              </DefaultLayout>
+            </BrandingProvider>
           </ProtectedRoute>
         }
       />
@@ -30,7 +66,11 @@ const ProtectedRoute = ({ children }: { children: JSX.Element }) => {
         path="/time-tracking"
         element={
           <ProtectedRoute>
-            <TimeTrackingPage />
+            <BrandingProvider mode="tenant" >
+              <DefaultLayout>
+                <TimeTrackingPage />
+              </DefaultLayout>
+            </BrandingProvider>
           </ProtectedRoute>
         }
       />

@@ -6,6 +6,7 @@ export type Branding = {
   accentColor: string;
   backgroundColor: string;
   logoUrl: string;
+  logoSrc?: string;
 };
 
 export type BrandingContextType = {
