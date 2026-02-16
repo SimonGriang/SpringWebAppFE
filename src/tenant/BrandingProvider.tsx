@@ -35,13 +35,34 @@ export const BrandingProvider: React.FC<{
   const STANDARD_BRANDING: Branding = {
     primaryColor: "#F28C28",
     secondaryColor: "#2F5D62",
-    accentColor: "#0056f5",
+    accentColor: "#8A8F98",
     backgroundColor: "#F7F7F7",
-    logoUrl: "/GriangLogo.png",
+    logoUrl: "/GriangLogo_ws.png",
   };
 
-const loadBranding = async () => {
+  const resolveLogoSrc = async(
+    logoUrl: string,
+    hasBackendLogo: boolean
+  ): Promise<string> => {
+    if (!hasBackendLogo) {
+      return logoUrl;
+    }
+
+    const blob = await apiClient(
+        `/backend/api/auth/${logoUrl}`,
+        {
+          method: "GET",
+          headers: {
+            Accept: "application/octet-stream",
+          },
+        }
+      );
+    return URL.createObjectURL(blob);
+  };
+
+  const loadBranding = async () => {
     setLoading(true);
+
 
     /* 🔴 FIX: expliziter Standard-Modus */
     if (mode === "standard") {
@@ -58,7 +79,12 @@ const loadBranding = async () => {
     }
 
     try {
-      const data = await apiClient("/backend/tenant/branding");
+      const data = await apiClient("/backend/api/auth/tenant/branding");
+      const hasBackendLogo = Boolean(data.logoUrl);
+      const logoUrl = hasBackendLogo
+        ? data.logoUrl
+        : STANDARD_BRANDING.logoUrl;
+      const resolvedLogoSrc = await resolveLogoSrc(logoUrl, hasBackendLogo);
 
       setBranding({
         primaryColor: data.primaryColor || STANDARD_BRANDING.primaryColor,
@@ -66,7 +92,8 @@ const loadBranding = async () => {
         accentColor: data.accentColor || STANDARD_BRANDING.accentColor,
         backgroundColor:
           data.backgroundColor || STANDARD_BRANDING.backgroundColor,
-        logoUrl: data.logoUrl || STANDARD_BRANDING.logoUrl,
+        logoUrl: logoUrl,
+        logoSrc: resolvedLogoSrc,
       });
     } catch (err) {
       console.error("Failed to load tenant branding", err);

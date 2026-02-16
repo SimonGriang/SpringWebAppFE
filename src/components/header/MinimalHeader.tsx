@@ -9,7 +9,7 @@ export const MinimalHeader = () => {
     >
       <Group align="center" style={{ height: '100%' }}>
         <Image
-          src="/GriangLogo.png"
+          src="/GriangLogo_ws.png"
           alt="Logo"
           height={40}
           fit="contain"

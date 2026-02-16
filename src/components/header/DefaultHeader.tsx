@@ -1,4 +1,4 @@
-import { useContext } from "react";
+import { useContext, useState } from "react";
 import { BrandingContext } from "../../tenant/BrandingContext";
 import { AuthContext } from "../../auth/AuthContext";
 
@@ -10,9 +10,18 @@ import {
   IconCoin,
   IconFingerprint,
   IconNotification,
+  IconHeart,
+  IconLogout,
+  IconMessage,
+  IconPlayerPause,
+  IconSettings,
+  IconStar,
+  IconSwitchHorizontal,
+  IconTrash,
 } from '@tabler/icons-react';
 import {
   Anchor,
+  Avatar,
   Box,
   Burger,
   Button,
@@ -22,6 +31,7 @@ import {
   Drawer,
   Group,
   HoverCard,
+  Menu,
   ScrollArea,
   SimpleGrid,
   Text,
@@ -31,6 +41,7 @@ import {
 } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import classes from '../stylings/HeaderStyling.module.css';
+import cx from 'clsx';
 
 const mockdata = [
   {
@@ -65,17 +76,19 @@ const mockdata = [
   },
 ];
 
+
 export const DefaultHeader = () => {
   const [drawerOpened, { toggle: toggleDrawer, close: closeDrawer }] = useDisclosure(false);
   const [linksOpened, { toggle: toggleLinks }] = useDisclosure(false);
   const theme = useMantineTheme();
   const { branding } = useContext(BrandingContext);
+  const [userMenuOpened, setUserMenuOpened] = useState(false);
   const { user } = useContext(AuthContext);
   const links = mockdata.map((item) => (
     <UnstyledButton className={classes.subLink} key={item.title}>
       <Group wrap="nowrap" align="flex-start">
         <ThemeIcon size={34} variant="default" radius="md">
-          <item.icon size={22}/>
+          <item.icon size={22} />
         </ThemeIcon>
         <div>
           <Text size="sm" fw={500}>
@@ -88,6 +101,23 @@ export const DefaultHeader = () => {
       </Group>
     </UnstyledButton>
   ));
+
+  function getContrastColor(hex: string): string {
+    // substring(start, end) statt substr(start, length)
+    const r = parseInt(hex.substring(1, 3), 16);
+    const g = parseInt(hex.substring(3, 5), 16);
+    const b = parseInt(hex.substring(5, 7), 16);
+
+    const brightness = (r * 299 + g * 587 + b * 114) / 1000;
+
+    return brightness > 160 ? 'black' : 'white';
+  }
+  if (!theme || !theme.colors.primary || !theme.colors.primary[6]) return null;
+  const bgColor = theme.colors.primary[6];
+  const textColor = getContrastColor(bgColor);
+  const initials = `${
+    user?.employeeFirstname?.[0] ?? 'V'
+  }${user?.employeeSurname?.[0] ?? 'N'}`;
 
   return (
     <Box pb={120}>
@@ -104,17 +134,17 @@ export const DefaultHeader = () => {
             )}
 
           <Group h="100%" gap={0} visibleFrom="sm">
-            <a href="#" className={classes.link}>
+            <a href="#" className={classes.link} style={{ color: textColor }}>
               Home
             </a>
             <HoverCard width={600} position="bottom" radius="md" shadow="md" withinPortal>
               <HoverCard.Target>
                 <a href="#" className={classes.link}>
                   <Center inline>
-                    <Box component="span" mr={5}>
+                    <Box component="span" mr={5} style={{ color: textColor }}>
                       Features
                     </Box>
-                    <IconChevronDown size={16} color={theme.colors.blue[6]} />
+                    <IconChevronDown size={16} color={theme.colors.background[0]} />
                   </Center>
                 </a>
               </HoverCard.Target>
@@ -148,18 +178,74 @@ export const DefaultHeader = () => {
                 </div>
               </HoverCard.Dropdown>
             </HoverCard>
-            <a href="#" className={classes.link}>
+            <a href="#" className={classes.link} style={{ color: textColor }}>
               Learn
             </a>
-            <a href="#" className={classes.link}>
+            <a href="#" className={classes.link} style={{ color: textColor }}>
               Academy
             </a>
           </Group>
 
-          <Group visibleFrom="sm">
-            <Button variant="default">Log in</Button>
-            <Button>Sign up</Button>
-          </Group>
+          <Menu
+            width={260}
+            position="bottom-end"
+            transitionProps={{ transition: 'pop-top-right' }}
+            onClose={() => setUserMenuOpened(false)}
+            onOpen={() => setUserMenuOpened(true)}
+            withinPortal
+          >
+            <Menu.Target>
+              <UnstyledButton
+                className={cx(classes.user, { [classes.userActive]: userMenuOpened })}
+              >
+                <Group gap={7}>
+                  <Avatar color={theme.colors.background[0]} radius="xl" size={40}>
+                    {initials.toUpperCase()}
+                  </Avatar>
+                  <Text fw={500} size="sm" lh={1} mr={3} style={{ color: textColor }}>
+                    {user?.employeeSurname ?? 'Nachname'}, {user?.employeeFirstname ?? 'Vorname'}
+                  </Text>
+                  <IconChevronDown size={12} stroke={1.5} color={theme.colors.accent[6]} />
+                </Group>
+              </UnstyledButton>
+            </Menu.Target>
+            <Menu.Dropdown>
+              <Menu.Item
+                leftSection={<IconHeart size={16} color={theme.colors.red[6]} stroke={1.5} />}
+              >
+                Liked posts
+              </Menu.Item>
+              <Menu.Item
+                leftSection={<IconStar size={16} color={theme.colors.yellow[6]} stroke={1.5} />}
+              >
+                Saved posts
+              </Menu.Item>
+              <Menu.Item
+                leftSection={<IconMessage size={16} color={theme.colors.blue[6]} stroke={1.5} />}
+              >
+                Your comments
+              </Menu.Item>
+
+              <Menu.Label>Settings</Menu.Label>
+              <Menu.Item leftSection={<IconSettings size={16} stroke={1.5} />}>
+                Account settings
+              </Menu.Item>
+              <Menu.Item leftSection={<IconSwitchHorizontal size={16} stroke={1.5} />}>
+                Change account
+              </Menu.Item>
+              <Menu.Item leftSection={<IconLogout size={16} stroke={1.5} />}>Logout</Menu.Item>
+
+              <Menu.Divider />
+
+              <Menu.Label>Danger zone</Menu.Label>
+              <Menu.Item leftSection={<IconPlayerPause size={16} stroke={1.5} />}>
+                Pause subscription
+              </Menu.Item>
+              <Menu.Item color="red" leftSection={<IconTrash size={16} stroke={1.5} />}>
+                Delete account
+              </Menu.Item>
+            </Menu.Dropdown>
+          </Menu>
 
           <Burger
             opened={drawerOpened}

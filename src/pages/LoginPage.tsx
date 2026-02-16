@@ -7,6 +7,7 @@ export const LoginPage = () => {
   const { login } = useAuth();
   const navigate = useNavigate();
 
+  const [companyUniqueIdentifier, setCompanyUniqueIdentifier] = useState("");
   const [employeeNumber, setEmployeeNumber] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -17,7 +18,7 @@ export const LoginPage = () => {
       const res = await fetch("/backend/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ employeeNumber, password }),
+        body: JSON.stringify({companyUniqueIdentifier, employeeNumber, password }),
       });
 
       if (!res.ok) {
@@ -57,6 +58,15 @@ export const LoginPage = () => {
         <Title order={2} style={{ textAlign: "center" }}>
           Login
         </Title>
+
+        {/* Mitarbeitennummer */}
+        <TextInput
+          label="Unternehmenskennung"
+          placeholder="Deine Unternehmenskennung"
+          value={companyUniqueIdentifier}
+          onChange={(e) => setCompanyUniqueIdentifier(e.currentTarget.value)}
+          required
+        />
 
         {/* Mitarbeitennummer */}
         <TextInput

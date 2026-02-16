@@ -13,28 +13,10 @@ export const DashboardPage = () => {
   }
 
   return (
-    <Box style={{ padding: 20, backgroundColor: branding?.backgroundColor }}>
-      {/* Header mit Branding */}
-      <Box
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          backgroundColor: branding?.primaryColor,
-          padding: "10px 20px",
-          borderRadius: 8,
-          color: "white",
-        }}
-      >
-        <Image src={branding?.logoUrl} height={40} alt="Logo" />
-        <Text>
-          {user?.employeeSurname}, {user?.employeeFirstname}
-        </Text>
-      </Box>
-
-      <Text size="xl" style={{ marginTop: 20 }}>
+    <Box>
+      <h1>
         Dashboard
-      </Text>
+      </h1>
 
       {/* Buttons mit Branding */}
       <Button

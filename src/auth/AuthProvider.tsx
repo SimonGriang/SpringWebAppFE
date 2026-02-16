@@ -10,7 +10,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const payload = decodeJwt(jwt);
 
     setToken(jwt);
+    console.log("Auth token:", jwt);
+
+
     setUser({
+      sub: payload.sub,
+      employeeFirstname: payload.employeeFirstname,
+      employeeSurname: payload.employeeSurname,
+      companyId: payload.companyId,
+      permissions: payload.permissions,
+    });
+    console.log("Auth user:", {
       sub: payload.sub,
       employeeFirstname: payload.employeeFirstname,
       employeeSurname: payload.employeeSurname,

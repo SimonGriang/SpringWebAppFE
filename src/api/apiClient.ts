@@ -2,14 +2,14 @@ export const createApiClient = (getToken: () => string | null) => {
   return async (url: string, options: RequestInit = {}) => {
     const token = getToken();
 
-    const headers: Record<string, string> = {
-      "Content-Type": "application/json",
-      ...(options.headers as Record<string, string>), // Type Assertion notwendig
-    };
+    const headers = new Headers(options.headers);
 
+    if (!(options.body instanceof FormData)) {
+      headers.set("Content-Type", "application/json");
+    }
 
     if (token) {
-      headers["Authorization"] = `Bearer ${token}`;
+      headers.set("Authorization", `Bearer ${token}`);
     }
 
     const response = await fetch(url, {
@@ -19,6 +19,10 @@ export const createApiClient = (getToken: () => string | null) => {
 
     if (!response.ok) {
       throw new Error("API Error");
+    }
+
+    if (headers.get("Accept") === "application/octet-stream") {
+      return response.blob();
     }
 
     return response.json();

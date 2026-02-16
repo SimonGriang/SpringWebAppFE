@@ -40,16 +40,6 @@ const ProtectedRoute = ({ children }: { children: JSX.Element }) => {
         } 
       />
 
-      <Route path="/login2" 
-        element={
-          <BrandingProvider mode="standard">      
-            <MinimalLayout>
-              <LoginPage2 />
-            </MinimalLayout>
-          </BrandingProvider>
-        } 
-      />
-
       <Route
         path="/dashboard"
         element={
