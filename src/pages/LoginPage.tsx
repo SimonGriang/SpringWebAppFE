@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Box, Stack, Title, TextInput, PasswordInput, Button, Anchor, Group, Text }  from "@mantine/core";
+import { Alert, Box, Stack, Title, TextInput, PasswordInput, Button, Anchor, Group, Text }  from "@mantine/core";
 import { useAuth } from "../auth/AuthContext";
+import { IconAlertCircle } from '@tabler/icons-react';
 
 export const LoginPage = () => {
   const { login } = useAuth();
@@ -11,6 +12,8 @@ export const LoginPage = () => {
   const [employeeNumber, setEmployeeNumber] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
 
   const submit = async () => {
     setLoading(true);
@@ -22,7 +25,10 @@ export const LoginPage = () => {
       });
 
       if (!res.ok) {
-        console.error("Login fehlgeschlagen", res.status);
+        setError('Benutzername oder Passwort ist falsch.');
+        setCompanyUniqueIdentifier('');
+        setEmployeeNumber('');
+        setPassword('');
         setLoading(false);
         return;
       }
@@ -39,6 +45,10 @@ export const LoginPage = () => {
       navigate("/dashboard");
     } catch (err) {
       console.error("Fehler beim Login", err);
+      setError('Benutzername oder Passwort ist falsch.');
+      setCompanyUniqueIdentifier('');
+      setEmployeeNumber('');
+      setPassword('');
     } finally {
       setLoading(false);
     }
@@ -59,25 +69,20 @@ export const LoginPage = () => {
           Login
         </Title>
 
-        {/* Mitarbeitennummer */}
         <TextInput
           label="Unternehmenskennung"
           placeholder="Deine Unternehmenskennung"
           value={companyUniqueIdentifier}
           onChange={(e) => setCompanyUniqueIdentifier(e.currentTarget.value)}
-          required
         />
 
-        {/* Mitarbeitennummer */}
         <TextInput
           label="Mitarbeiternummer"
           placeholder="Deine Mitarbeitennummer"
           value={employeeNumber}
           onChange={(e) => setEmployeeNumber(e.currentTarget.value)}
-          required
         />
 
-        {/* Passwort */}
         <Box>
           <Group justify="apart" mb={5}>
             <Text component="label" htmlFor="password" size="sm" fw={500}>
@@ -89,10 +94,17 @@ export const LoginPage = () => {
             placeholder="Dein Passwort"
             value={password}
             onChange={(e) => setPassword(e.currentTarget.value)}
-            required
           />
         </Box>
-
+        {error && (
+          <Alert 
+            icon={<IconAlertCircle size={16} />} 
+            color="red" 
+            mt="md"
+          >
+            {error}
+          </Alert>
+        )}
         <Anchor href="#" onClick={(e) => e.preventDefault()} pt={2} fw={500} fz="xs">
           Passwort vergessen?
         </Anchor>
@@ -100,6 +112,8 @@ export const LoginPage = () => {
         <Button fullWidth onClick={submit} loading={loading}>
           Login
         </Button>
+
+
       </Stack>
     </Box>
   );

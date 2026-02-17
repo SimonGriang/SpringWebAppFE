@@ -140,11 +140,11 @@ export const DefaultHeader = () => {
             <HoverCard width={600} position="bottom" radius="md" shadow="md" withinPortal>
               <HoverCard.Target>
                 <a href="#" className={classes.link}>
-                  <Center inline>
-                    <Box component="span" mr={5} style={{ color: textColor }}>
-                      Features
+                  <Center inline style={{ backgroundColor: 'transparent' }}>
+                    <Box component="span" mr={5} style={{ color: textColor, backgroundColor: 'transparent'}}>
+                      Zeiterfassung
                     </Box>
-                    <IconChevronDown size={16} color={theme.colors.background[0]} />
+                    <IconChevronDown size={16} color={theme.colors.background[0]} style={{ backgroundColor: 'transparent' }} />
                   </Center>
                 </a>
               </HoverCard.Target>
@@ -179,10 +179,10 @@ export const DefaultHeader = () => {
               </HoverCard.Dropdown>
             </HoverCard>
             <a href="#" className={classes.link} style={{ color: textColor }}>
-              Learn
+              Benutzerverwaltung
             </a>
             <a href="#" className={classes.link} style={{ color: textColor }}>
-              Academy
+              Wunsch?
             </a>
           </Group>
 
@@ -205,7 +205,7 @@ export const DefaultHeader = () => {
                   <Text fw={500} size="sm" lh={1} mr={3} style={{ color: textColor }}>
                     {user?.employeeSurname ?? 'Nachname'}, {user?.employeeFirstname ?? 'Vorname'}
                   </Text>
-                  <IconChevronDown size={12} stroke={1.5} color={theme.colors.accent[6]} />
+                  <IconChevronDown size={12} stroke={4.5} style={{ color: textColor }} />
                 </Group>
               </UnstyledButton>
             </Menu.Target>
@@ -271,20 +271,20 @@ export const DefaultHeader = () => {
           <a href="#" className={classes.link}>
             Home
           </a>
-          <UnstyledButton className={classes.link} onClick={toggleLinks}>
+          <UnstyledButton className={classes.link} onClick={toggleLinks} >
             <Center inline>
               <Box component="span" mr={5}>
-                Features
+                Zeiterfassung
               </Box>
               <IconChevronDown size={16} color={theme.colors.blue[6]} />
             </Center>
           </UnstyledButton>
           <Collapse in={linksOpened}>{links}</Collapse>
           <a href="#" className={classes.link}>
-            Learn
+            Benutzerverwaltung
           </a>
           <a href="#" className={classes.link}>
-            Academy
+            Wunsch?
           </a>
 
           <Divider my="sm" />
