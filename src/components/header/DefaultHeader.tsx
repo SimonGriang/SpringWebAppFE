@@ -82,10 +82,28 @@ export const DefaultHeader = () => {
   const [linksOpened, { toggle: toggleLinks }] = useDisclosure(false);
   const theme = useMantineTheme();
   const { branding } = useContext(BrandingContext);
-  const [userMenuOpened, setUserMenuOpened] = useState(false);
+  const [userMenuOpened, { toggle: toggleUserMenu, close: closeUserMenu }] = useDisclosure(false);
   const { user } = useContext(AuthContext);
   const links = mockdata.map((item) => (
     <UnstyledButton className={classes.subLink} key={item.title}>
+      <Group wrap="nowrap" align="flex-start">
+        <ThemeIcon size={34} variant="default" radius="md">
+          <item.icon size={22} />
+        </ThemeIcon>
+        <div>
+          <Text size="sm" fw={500}>
+            {item.title}
+          </Text>
+          <Text size="xs" c="dimmed">
+            {item.description}
+          </Text>
+        </div>
+      </Group>
+    </UnstyledButton>
+  ));
+
+  const drawerLinks = mockdata.map((item) => (
+    <UnstyledButton className={classes.subLink} key={item.title} fz="sm" p="xs">
       <Group wrap="nowrap" align="flex-start">
         <ThemeIcon size={34} variant="default" radius="md">
           <item.icon size={22} />
@@ -127,13 +145,13 @@ export const DefaultHeader = () => {
                 <img
                     src={branding.logoSrc}
                     alt="Logo"
-                    style={{ height: 30 }}
+                    style={{ height: 40 }}
                 />
             ) : (
-                <Text fw={700}>App</Text>
+                <Text fw={700} style={{ color: textColor }}>GriangApp</Text>
             )}
 
-          <Group h="100%" gap={0} visibleFrom="sm">
+          <Group h="100%" gap={0} visibleFrom="md">
             <a href="#" className={classes.link} style={{ color: textColor }}>
               Home
             </a>
@@ -185,73 +203,75 @@ export const DefaultHeader = () => {
               Wunsch?
             </a>
           </Group>
+          <Box visibleFrom="xs">
+            <Menu
+              width={260}
+              position="bottom-end"
+              transitionProps={{ transition: 'pop-top-right' }}
+              onClose={() => closeUserMenu()}
+              onOpen={() => toggleUserMenu()}
+              withinPortal
+            >
+              <Menu.Target>
+                <UnstyledButton
+                  className={cx(classes.user, { [classes.userActive]: userMenuOpened })}
+                  visibleFrom="md"
+                >
+                  <Group gap={7}>
+                    <Avatar color={theme.colors.background[0]} radius="xl" size={40}>
+                      {initials.toUpperCase()}
+                    </Avatar>
+                    <Text fw={500} size="sm" lh={1} mr={3} style={{ color: textColor }}>
+                      {user?.employeeSurname ?? 'Nachname'}, {user?.employeeFirstname ?? 'Vorname'}
+                    </Text>
+                    <IconChevronDown size={12} stroke={4.5} style={{ color: textColor }} />
+                  </Group>
+                </UnstyledButton>
+              </Menu.Target>
+              <Menu.Dropdown>
+                <Menu.Item
+                  leftSection={<IconHeart size={16} color={theme.colors.red[6]} stroke={1.5} />}
+                >
+                  Liked posts
+                </Menu.Item>
+                <Menu.Item
+                  leftSection={<IconStar size={16} color={theme.colors.yellow[6]} stroke={1.5} />}
+                >
+                  Saved posts
+                </Menu.Item>
+                <Menu.Item
+                  leftSection={<IconMessage size={16} color={theme.colors.blue[6]} stroke={1.5} />}
+                >
+                  Your comments
+                </Menu.Item>
 
-          <Menu
-            width={260}
-            position="bottom-end"
-            transitionProps={{ transition: 'pop-top-right' }}
-            onClose={() => setUserMenuOpened(false)}
-            onOpen={() => setUserMenuOpened(true)}
-            withinPortal
-          >
-            <Menu.Target>
-              <UnstyledButton
-                className={cx(classes.user, { [classes.userActive]: userMenuOpened })}
-              >
-                <Group gap={7}>
-                  <Avatar color={theme.colors.background[0]} radius="xl" size={40}>
-                    {initials.toUpperCase()}
-                  </Avatar>
-                  <Text fw={500} size="sm" lh={1} mr={3} style={{ color: textColor }}>
-                    {user?.employeeSurname ?? 'Nachname'}, {user?.employeeFirstname ?? 'Vorname'}
-                  </Text>
-                  <IconChevronDown size={12} stroke={4.5} style={{ color: textColor }} />
-                </Group>
-              </UnstyledButton>
-            </Menu.Target>
-            <Menu.Dropdown>
-              <Menu.Item
-                leftSection={<IconHeart size={16} color={theme.colors.red[6]} stroke={1.5} />}
-              >
-                Liked posts
-              </Menu.Item>
-              <Menu.Item
-                leftSection={<IconStar size={16} color={theme.colors.yellow[6]} stroke={1.5} />}
-              >
-                Saved posts
-              </Menu.Item>
-              <Menu.Item
-                leftSection={<IconMessage size={16} color={theme.colors.blue[6]} stroke={1.5} />}
-              >
-                Your comments
-              </Menu.Item>
+                <Menu.Label>Settings</Menu.Label>
+                <Menu.Item leftSection={<IconSettings size={16} stroke={1.5} />}>
+                  Account settings
+                </Menu.Item>
+                <Menu.Item leftSection={<IconSwitchHorizontal size={16} stroke={1.5} />}>
+                  Change account
+                </Menu.Item>
+                <Menu.Item leftSection={<IconLogout size={16} stroke={1.5} />}>Logout</Menu.Item>
 
-              <Menu.Label>Settings</Menu.Label>
-              <Menu.Item leftSection={<IconSettings size={16} stroke={1.5} />}>
-                Account settings
-              </Menu.Item>
-              <Menu.Item leftSection={<IconSwitchHorizontal size={16} stroke={1.5} />}>
-                Change account
-              </Menu.Item>
-              <Menu.Item leftSection={<IconLogout size={16} stroke={1.5} />}>Logout</Menu.Item>
+                <Menu.Divider />
 
-              <Menu.Divider />
-
-              <Menu.Label>Danger zone</Menu.Label>
-              <Menu.Item leftSection={<IconPlayerPause size={16} stroke={1.5} />}>
-                Pause subscription
-              </Menu.Item>
-              <Menu.Item color="red" leftSection={<IconTrash size={16} stroke={1.5} />}>
-                Delete account
-              </Menu.Item>
-            </Menu.Dropdown>
-          </Menu>
-
+                <Menu.Label>Danger zone</Menu.Label>
+                <Menu.Item leftSection={<IconPlayerPause size={16} stroke={1.5} />}>
+                  Pause subscription
+                </Menu.Item>
+                <Menu.Item color="red" leftSection={<IconTrash size={16} stroke={1.5} />}>
+                  Delete account
+                </Menu.Item>
+              </Menu.Dropdown>
+            </Menu>
+          </Box>
           <Burger
             opened={drawerOpened}
             onClick={toggleDrawer}
-            hiddenFrom="sm"
+            hiddenFrom="md"
             aria-label="Toggle navigation"
+            color={textColor}
           />
         </Group>
       </header>
@@ -268,31 +288,61 @@ export const DefaultHeader = () => {
         <ScrollArea h="calc(100vh - 80px" mx="-md">
           <Divider my="sm" />
 
-          <a href="#" className={classes.link}>
+          <a href="#" className={classes.drawerLink}>
             Home
           </a>
-          <UnstyledButton className={classes.link} onClick={toggleLinks} >
+          <UnstyledButton 
+            className={classes.drawerLink} 
+            onClick={toggleLinks}
+            fz="sm"
+            p="md"
+            >
             <Center inline>
               <Box component="span" mr={5}>
                 Zeiterfassung
               </Box>
-              <IconChevronDown size={16} color={theme.colors.blue[6]} />
+              <IconChevronDown size={16} color={theme.colors.background[10]} style={{ backgroundColor: 'transparent' }} />
             </Center>
           </UnstyledButton>
-          <Collapse in={linksOpened}>{links}</Collapse>
-          <a href="#" className={classes.link}>
+          <Collapse in={linksOpened}>{drawerLinks}</Collapse>
+          <a href="#" className={classes.drawerLink}>
             Benutzerverwaltung
           </a>
-          <a href="#" className={classes.link}>
+          <a href="#" className={classes.drawerLink}>
             Wunsch?
           </a>
 
           <Divider my="sm" />
 
-          <Group justify="center" grow pb="xl" px="md">
-            <Button variant="default">Log in</Button>
-            <Button>Sign up</Button>
-          </Group>
+          <UnstyledButton
+            className={classes.drawerLink}
+            onClick={toggleUserMenu}
+            fz="sm"
+            px="md"
+          >
+            <Center inline>
+              <Avatar
+                radius="xl"
+                size={32}
+                styles={{
+                  root: { backgroundColor: 'var(--mantine-color-primary-6)' },
+                  placeholder: { color: 'white' }
+                }}
+              >
+                {initials.toUpperCase()}
+              </Avatar>
+              <Box component="span" mr={5} style={{ paddingLeft: 'calc(var(--mantine-spacing-md)/2)' }}>
+                {user?.employeeSurname ?? 'Nachname'}, {user?.employeeFirstname ?? 'Vorname'}
+              </Box>
+              <IconChevronDown size={16} />
+            </Center>
+          </UnstyledButton>
+
+          <Collapse in={userMenuOpened}>
+            <a href="#" className={classes.drawerLink} style={{ paddingLeft: 'calc(var(--mantine-spacing-md) * 2)' }}>Account settings</a>
+            <a href="#" className={classes.drawerLink} style={{ paddingLeft: 'calc(var(--mantine-spacing-md) * 2)' }}>Change account</a>
+            <a href="#" className={classes.drawerLink} style={{ paddingLeft: 'calc(var(--mantine-spacing-md) * 2)' }}>Logout</a>
+          </Collapse>
         </ScrollArea>
       </Drawer>
     </Box>

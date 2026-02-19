@@ -1,6 +1,5 @@
 import React, { useContext } from "react";
-import { motion } from "framer-motion";
-import { Card, Text } from "@mantine/core";
+import { Card, Text, Group, Button, SimpleGrid, Container, Badge, Stack, Title } from "@mantine/core";
 import { useNavigate } from "react-router-dom";
 import { IconClock, IconUsers, IconSettings, IconFileInvoice } from "@tabler/icons-react";
 import { AuthContext } from "../auth/AuthContext";
@@ -17,36 +16,113 @@ export function DashboardPage() {
   const { user } = useContext(AuthContext);
 
   return (
-    <div className="min-h-screen bg-gray-50 p-8">
-      <div className="max-w-7xl mx-auto space-y-10">
-        <div>
-          <h1 className="text-3xl md:text-4xl font-semibold tracking-tight">Dashboard</h1>
-          <Text className="text-gray-600 mt-2 text-base">
-            Hallo {user?.employeeFirstname ?? ""}, wähle ein Modul, um direkt in den jeweiligen Funktionsbereich zu springen.
-          </Text>
-        </div>
+    <Container size="lg" py="xl">
+      <Stack gap="xl">
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {modules.map((module, index) => {
-            const Icon = module.icon;
-            return (
-              <motion.div key={module.title} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: index * 0.05 }}>
-                <Card shadow="sm" padding="lg" radius="md" className="cursor-pointer hover:shadow-lg transition-all duration-200 hover:-translate-y-1" onClick={() => navigate(module.href)}>
-                  <div className="flex flex-col gap-4">
-                    <div className="w-12 h-12 rounded-2xl bg-blue-100 flex items-center justify-center">
-                      {Icon && <Icon size={26} className="text-blue-600" />}
-                    </div>
-                    <div className="space-y-1">
-                      <h2 className="text-lg font-semibold">{module.title}</h2>
-                      <Text className="text-sm text-gray-600 leading-relaxed">{module.description}</Text>
-                    </div>
-                  </div>
-                </Card>
-              </motion.div>
-            );
-          })}
-        </div>
-      </div>
-    </div>
+        {/* Header */}
+        <Stack gap={4}>
+          <Title order={1}>
+            Dashboard
+          </Title>
+
+          <Text c="dimmed">
+            Hallo {user?.employeeFirstname ?? ""}, wähle ein Modul, um direkt in
+            den jeweiligen Funktionsbereich zu springen.
+          </Text>
+        </Stack>
+        <SimpleGrid
+          cols={{ base: 1, sm: 2, lg: 3 }}
+          spacing="lg"
+        >
+          {/* Card 1 */}
+          <Card shadow="sm" padding="lg" radius="md" withBorder>
+            <Card.Section>
+              <div style={{ display: 'flex', justifyContent: 'center', padding: '40px 0' }}>
+                <IconClock size={80} />
+              </div>
+            </Card.Section>
+
+            <Group justify="space-between" mt="md" mb="xs">
+              <Text fw={500}>Norway Fjord Adventures</Text>
+              <Badge color="pink">On Sale</Badge>
+            </Group>
+
+            <Text size="sm" c="dimmed">
+              Explore magical fjord landscapes with tours and activities.
+            </Text>
+
+            <Button color="blue" fullWidth mt="md" radius="md">
+              Book classic tour now
+            </Button>
+          </Card>
+
+          {/* Card 2 */}
+          <Card shadow="sm" padding="lg" radius="md" withBorder>
+            <Card.Section>
+              <div style={{ display: 'flex', justifyContent: 'center', padding: '40px 0' }}>
+                <IconUsers size={80} />
+              </div>
+            </Card.Section>
+
+            <Group justify="space-between" mt="md" mb="xs">
+              <Text fw={500}>Arctic Expedition</Text>
+              <Badge color="pink">On Sale</Badge>
+            </Group>
+
+            <Text size="sm" c="dimmed">
+              Discover the untouched beauty of the Arctic region.
+            </Text>
+
+            <Button color="blue" fullWidth mt="md" radius="md">
+              Book classic tour now
+            </Button>
+          </Card>
+
+          {/* Card 3 */}
+          <Card shadow="sm" padding="lg" radius="md" withBorder>
+            <Card.Section>
+              <div style={{ display: 'flex', justifyContent: 'center', padding: '40px 0' }}>
+                <IconSettings size={80} />
+              </div>
+            </Card.Section>
+
+            <Group justify="space-between" mt="md" mb="xs">
+              <Text fw={500}>Mountain Hiking</Text>
+              <Badge color="pink">On Sale</Badge>
+            </Group>
+
+            <Text size="sm" c="dimmed">
+              Experience breathtaking mountain views and fresh air.
+            </Text>
+
+            <Button color="blue" fullWidth mt="md" radius="md">
+              Book classic tour now
+            </Button>
+          </Card>
+
+          {/* Card 4 */}
+          <Card shadow="sm" padding="lg" radius="md" withBorder>
+            <Card.Section>
+              <div style={{ display: 'flex', justifyContent: 'center', padding: '40px 0' }}>
+                <IconFileInvoice size={80} />
+              </div>
+            </Card.Section>
+
+            <Group justify="space-between" mt="md" mb="xs">
+              <Text fw={500}>City Exploration</Text>
+              <Badge color="pink">On Sale</Badge>
+            </Group>
+
+            <Text size="sm" c="dimmed">
+              Discover vibrant cities with guided exploration tours.
+            </Text>
+
+            <Button color="blue" fullWidth mt="md" radius="md">
+              Book classic tour now
+            </Button>
+          </Card>
+      </SimpleGrid>
+    </Stack>
+  </Container>
   );
 }
