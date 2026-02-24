@@ -1,4 +1,6 @@
 import { createContext, useContext } from "react";
+import type { PermissionProfile } from "./authTypes";
+
 
 export type User = {
   sub: string;
@@ -11,7 +13,8 @@ export type User = {
 export type AuthContextType = {
   token: string | null;
   user: User | null;
-  login: (token: string) => void;
+  permissionProfile: PermissionProfile | null;
+  login: (token: string, permissionProfile: PermissionProfile) => void;
   logout: () => void;
 };
 

@@ -35,13 +35,13 @@ export const LoginPage = () => {
 
       const data = await res.json();
 
-      if (!data.token) {
+      if (!data.accessToken) {
         console.error("Kein Token erhalten", data);
         setLoading(false);
         return;
       }
 
-      login(data.token);
+      login(data.accessToken, data.permissionProfile);
       navigate("/dashboard");
     } catch (err) {
       console.error("Fehler beim Login", err);

@@ -282,7 +282,7 @@ export const DefaultHeader = () => {
         size="100%"
         padding="md"
         title="Navigation"
-        hiddenFrom="sm"
+        hiddenFrom="md"
         zIndex={1000000}
       >
         <ScrollArea h="calc(100vh - 80px" mx="-md">
