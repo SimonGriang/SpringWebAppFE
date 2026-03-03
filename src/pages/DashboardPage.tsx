@@ -1,19 +1,56 @@
-import React, { useContext } from "react";
-import { Card, Text, Group, Button, SimpleGrid, Container, Badge, Stack, Title } from "@mantine/core";
+import { useContext } from "react";
+import {
+  Badge,
+  Button,
+  Card,
+  Container,
+  Group,
+  SimpleGrid,
+  Stack,
+  Text,
+  Title,
+} from "@mantine/core";
 import { useNavigate } from "react-router-dom";
-import { IconClock, IconUsers, IconSettings, IconFileInvoice } from "@tabler/icons-react";
+import { IconClock, IconFileInvoice, IconSettings, IconUsers } from "@tabler/icons-react";
 import { AuthContext } from "../auth/AuthContext";
+import { useNotificationContext } from "../components/layout/DefaultLayout";
 
+// Modul-Key muss exakt dem NotificationModule-Enum im Backend entsprechen
 const modules = [
-  { title: "Zeiterfassung", description: "Arbeitszeiten erfassen, bearbeiten und auswerten.", icon: IconClock, href: "/zeiterfassung" },
-  { title: "Benutzerverwaltung", description: "Benutzer anlegen, Rollen verwalten und Berechtigungen steuern.", icon: IconUsers, href: "/benutzerverwaltung" },
-  { title: "Einstellungen", description: "Systemweite Konfigurationen und Präferenzen festlegen.", icon: IconSettings, href: "/einstellungen" },
-  { title: "Lieferscheinerstellung", description: "Lieferscheine erstellen, bearbeiten und exportieren.", icon: IconFileInvoice, href: "/lieferscheine" }
+  {
+    title: "Zeiterfassung",
+    description: "Arbeitszeiten erfassen, bearbeiten und auswerten.",
+    icon: IconClock,
+    href: "/zeiterfassung",
+    moduleKey: "ZEITERFASSUNG",
+  },
+  {
+    title: "Benutzerverwaltung",
+    description: "Benutzer anlegen, Rollen verwalten und Berechtigungen steuern.",
+    icon: IconUsers,
+    href: "/benutzerverwaltung",
+    moduleKey: "BENUTZERVERWALTUNG",
+  },
+  {
+    title: "Einstellungen",
+    description: "Systemweite Konfigurationen und Präferenzen festlegen.",
+    icon: IconSettings,
+    href: "/einstellungen",
+    moduleKey: null, // kein Modul-Badge
+  },
+  {
+    title: "Lieferscheinerstellung",
+    description: "Lieferscheine erstellen, bearbeiten und exportieren.",
+    icon: IconFileInvoice,
+    href: "/lieferscheine",
+    moduleKey: null,
+  },
 ];
 
 export function DashboardPage() {
   const navigate = useNavigate();
   const { user } = useContext(AuthContext);
+  const { moduleCounts } = useNotificationContext();
 
   return (
     <Container size="lg" py="xl">
@@ -21,108 +58,58 @@ export function DashboardPage() {
 
         {/* Header */}
         <Stack gap={4}>
-          <Title order={1}>
-            Dashboard
-          </Title>
-
+          <Title order={1}>Dashboard</Title>
           <Text c="dimmed">
             Hallo {user?.employeeFirstname ?? ""}, wähle ein Modul, um direkt in
             den jeweiligen Funktionsbereich zu springen.
           </Text>
         </Stack>
-        <SimpleGrid
-          cols={{ base: 1, sm: 2, lg: 3 }}
-          spacing="lg"
-        >
-          {/* Card 1 */}
-          <Card shadow="sm" padding="lg" radius="md" withBorder>
-            <Card.Section>
-              <div style={{ display: 'flex', justifyContent: 'center', padding: '40px 0' }}>
-                <IconClock size={80} />
-              </div>
-            </Card.Section>
 
-            <Group justify="space-between" mt="md" mb="xs">
-              <Text fw={500}>Norway Fjord Adventures</Text>
-              <Badge color="pink">On Sale</Badge>
-            </Group>
+        {/* Modul-Karten */}
+        <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }} spacing="lg">
+          {modules.map((mod) => {
+            const Icon  = mod.icon;
+            const count = mod.moduleKey ? (moduleCounts[mod.moduleKey] ?? 0) : 0;
 
-            <Text size="sm" c="dimmed">
-              Explore magical fjord landscapes with tours and activities.
-            </Text>
+            return (
+              <Card key={mod.title} shadow="sm" padding="lg" radius="md" withBorder>
+                <Card.Section>
+                  <div style={{ display: "flex", justifyContent: "center", padding: "40px 0" }}>
+                    <Icon size={80} />
+                  </div>
+                </Card.Section>
 
-            <Button color="blue" fullWidth mt="md" radius="md">
-              Book classic tour now
-            </Button>
-          </Card>
+                <Group justify="space-between" mt="md" mb="xs">
+                  <Text fw={500}>{mod.title}</Text>
 
-          {/* Card 2 */}
-          <Card shadow="sm" padding="lg" radius="md" withBorder>
-            <Card.Section>
-              <div style={{ display: 'flex', justifyContent: 'center', padding: '40px 0' }}>
-                <IconUsers size={80} />
-              </div>
-            </Card.Section>
+                  {/* Badge ersetzt das alte "ON SALE" — zeigt offene Notifications */}
+                  {count > 0 ? (
+                    <Badge color="red" variant="filled">
+                      {count} {count === 1 ? "Mitteilung" : "Mitteilungen"}
+                    </Badge>
+                  ) : (
+                    <Badge color="green" variant="light">
+                      Alles erledigt
+                    </Badge>
+                  )}
+                </Group>
 
-            <Group justify="space-between" mt="md" mb="xs">
-              <Text fw={500}>Arctic Expedition</Text>
-              <Badge color="pink">On Sale</Badge>
-            </Group>
+                <Text size="sm" c="dimmed">{mod.description}</Text>
 
-            <Text size="sm" c="dimmed">
-              Discover the untouched beauty of the Arctic region.
-            </Text>
-
-            <Button color="blue" fullWidth mt="md" radius="md">
-              Book classic tour now
-            </Button>
-          </Card>
-
-          {/* Card 3 */}
-          <Card shadow="sm" padding="lg" radius="md" withBorder>
-            <Card.Section>
-              <div style={{ display: 'flex', justifyContent: 'center', padding: '40px 0' }}>
-                <IconSettings size={80} />
-              </div>
-            </Card.Section>
-
-            <Group justify="space-between" mt="md" mb="xs">
-              <Text fw={500}>Mountain Hiking</Text>
-              <Badge color="pink">On Sale</Badge>
-            </Group>
-
-            <Text size="sm" c="dimmed">
-              Experience breathtaking mountain views and fresh air.
-            </Text>
-
-            <Button color="blue" fullWidth mt="md" radius="md">
-              Book classic tour now
-            </Button>
-          </Card>
-
-          {/* Card 4 */}
-          <Card shadow="sm" padding="lg" radius="md" withBorder>
-            <Card.Section>
-              <div style={{ display: 'flex', justifyContent: 'center', padding: '40px 0' }}>
-                <IconFileInvoice size={80} />
-              </div>
-            </Card.Section>
-
-            <Group justify="space-between" mt="md" mb="xs">
-              <Text fw={500}>City Exploration</Text>
-              <Badge color="pink">On Sale</Badge>
-            </Group>
-
-            <Text size="sm" c="dimmed">
-              Discover vibrant cities with guided exploration tours.
-            </Text>
-
-            <Button color="blue" fullWidth mt="md" radius="md">
-              Book classic tour now
-            </Button>
-          </Card>
-      </SimpleGrid>
-    </Stack>
-  </Container>
+                <Button
+                  color="blue"
+                  fullWidth
+                  mt="md"
+                  radius="md"
+                  onClick={() => navigate(mod.href)}
+                >
+                  Modul öffnen
+                </Button>
+              </Card>
+            );
+          })}
+        </SimpleGrid>
+      </Stack>
+    </Container>
   );
 }
