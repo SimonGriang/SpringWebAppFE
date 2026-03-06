@@ -1,4 +1,8 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useContext, useRef } from "react";
+import { createApiClient } from "../../api/apiClient";
+import { AuthContext } from "../../auth/AuthContext";
+
+// ─── Typen ────────────────────────────────────────────────────────────────────
 
 export type NotificationCategory = "INFO" | "SUCCESS" | "WARNING" | "ERROR";
 export type NotificationModule = "ZEITERFASSUNG" | "BENUTZERVERWALTUNG" | null;
@@ -24,122 +28,98 @@ export interface NotificationDTO {
   sender: SenderDTO | null;
 }
 
-// Mock-Daten — werden ersetzt sobald Backend-Endpoints aktiv sind
-const MOCK: NotificationDTO[] = [
-  {
-    id: 1,
-    title: "Arbeitszeitverletzung",
-    message: "Dein Eintrag vom 01.03.2026 überschreitet die zulässige Arbeitszeit. Bitte korrigiere den Eintrag im Modul.",
-    category: "WARNING",
-    module: "ZEITERFASSUNG",
-    scope: "PERSONAL",
-    manuallyDismissable: false,
-    read: false,
-    createdAt: new Date(Date.now() - 1000 * 60 * 30).toISOString(),
-    readAt: null,
-    sender: null,
-  },
-  {
-    id: 2,
-    title: "Willkommen im System",
-    message: "Dein Account wurde erfolgreich eingerichtet. Bei Fragen wende dich an deinen Teamlead.",
-    category: "INFO",
-    module: null,
-    scope: "PERSONAL",
-    manuallyDismissable: true,
-    read: false,
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(),
-    readAt: null,
-    sender: { id: 5, firstname: "Maria", surname: "Huber" },
-  },
-  {
-    id: 3,
-    title: "Systemwartung am 10.03.2026",
-    message: "Am 10.03.2026 um 22:00 Uhr findet eine planmäßige Wartung statt. Das System ist ca. 30 Minuten nicht verfügbar.",
-    category: "INFO",
-    module: null,
-    scope: "GLOBAL",
-    manuallyDismissable: true,
-    read: false,
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 5).toISOString(),
-    readAt: null,
-    sender: null,
-  },
-  {
-    id: 4,
-    title: "Fehlende Zeiterfassung",
-    message: "Für den 28.02.2026 fehlt deine Zeiterfassung. Bitte trage sie nach.",
-    category: "ERROR",
-    module: "ZEITERFASSUNG",
-    scope: "PERSONAL",
-    manuallyDismissable: false,
-    read: false,
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(),
-    readAt: null,
-    sender: null,
-  },
-];
+type ModuleCounts = Partial<Record<NonNullable<NotificationModule>, number>>;
+
+// ─── Hook ─────────────────────────────────────────────────────────────────────
 
 export function useNotifications() {
-  const [notifications, setNotifications] = useState<NotificationDTO[]>([]);
-  const [moduleCounts, setModuleCounts] = useState<Record<string, number>>({});
-  const [loading, setLoading] = useState(true);
+  const { token } = useContext(AuthContext);
+  const apiClient = createApiClient(() => token);
 
-  const computeModuleCounts = (notifs: NotificationDTO[]) => {
-    const counts: Record<string, number> = {};
-    notifs.forEach((n) => {
-      if (n.module) counts[n.module] = (counts[n.module] ?? 0) + 1;
-    });
-    return counts;
-  };
+  const [notifications, setNotifications] = useState<NotificationDTO[]>([]);
+  const [moduleCounts, setModuleCounts] = useState<ModuleCounts>({});
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // useRef statt lokaler Variable – überlebt Re-Renders ohne den useEffect
+  // neu zu triggern, und erlaubt sauberes Cleanup beim Unmount
+  const esRef = useRef<EventSource | null>(null);
 
   const fetchNotifications = useCallback(async () => {
+    setError(null);
     try {
-      // TODO: Echte API-Aufrufe wenn Backend steht:
-      // const [unread, counts] = await Promise.all([
-      //   apiClient.get('/notifications/unread'),
-      //   apiClient.get('/notifications/unread/count-per-module'),
-      // ]);
-      // setNotifications(unread);
-      // setModuleCounts(counts);
-
-      const unread = MOCK.filter((n) => !n.read);
+      const [unread, counts] = await Promise.all([
+        apiClient("/backend/api/notifications/unread") as Promise<NotificationDTO[]>,
+        apiClient("/backend/api/notifications/unread/count-per-module") as Promise<ModuleCounts>,
+      ]);
       setNotifications(unread);
-      setModuleCounts(computeModuleCounts(unread));
+      setModuleCounts(counts);
+    } catch (err) {
+      console.error("Fehler beim Laden der Notifications:", err);
+      setError("Notifications konnten nicht geladen werden.");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [token]);
 
   useEffect(() => {
+    if (!token) return;
+
     fetchNotifications();
 
-    // TODO: SSE aktivieren wenn Backend steht:
-    // const es = new EventSource('/api/notifications/stream', { withCredentials: true });
-    // es.addEventListener('notification-update', () => fetchNotifications());
-    // es.onerror = () => { es.close(); setTimeout(fetchNotifications, 3000); };
-    // return () => es.close();
-  }, [fetchNotifications]);
+    const connectSse = async () => {
+      try {
+        // Schritt 1 – kurzlebigen Einmal-Token holen (JWT geht sauber im Header mit)
+        const { sseToken } = await apiClient(
+          "/backend/api/notifications/sse-token"
+        ) as { sseToken: string };
+
+        // Schritt 2 – SSE mit Einmal-Token aufbauen (UUID, kein JWT in der URL)
+        const es = new EventSource(
+          `/backend/api/notifications/stream?token=${sseToken}`
+        );
+        esRef.current = es;
+
+        es.addEventListener("notification-update", () => fetchNotifications());
+
+        es.onerror = () => {
+          es.close();
+          esRef.current = null;
+          // Verbindung verloren – nach 5 Sekunden neu verbinden
+          setTimeout(connectSse, 5_000);
+        };
+      } catch {
+        // SSE nicht verfügbar – kein Problem, initiales fetch läuft bereits
+      }
+    };
+
+    connectSse();
+
+    return () => {
+      esRef.current?.close();
+      esRef.current = null;
+    };
+  }, [token]); // nur token als Dependency – fetchNotifications bewusst ausgelassen
+  // da connectSse nur beim Login/Logout neu aufgebaut werden soll
 
   const markAsRead = useCallback(
     async (id: number) => {
-      // TODO: await apiClient.patch(`/notifications/${id}/read`);
-      // Nach echtem Backend-Aufruf übernimmt SSE das State-Update automatisch
-
-      // Mock: direkt aus lokalem State entfernen
-      setNotifications((prev) => {
-        const updated = prev.filter((n) => n.id !== id);
-        setModuleCounts(computeModuleCounts(updated));
-        return updated;
-      });
+      try {
+        await apiClient(`/backend/api/notifications/${id}/read`, {
+          method: "PATCH",
+        });
+      } catch (err) {
+        console.error(`Fehler beim Markieren der Notification ${id}:`, err);
+      }
     },
-    []
+    [token]
   );
 
   return {
     notifications,
     moduleCounts,
     loading,
+    error,
     unreadCount: notifications.length,
     markAsRead,
     refetch: fetchNotifications,
