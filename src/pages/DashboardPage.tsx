@@ -28,7 +28,7 @@ const modules = [
     title: "Benutzerverwaltung",
     description: "Benutzer anlegen, Rollen verwalten und Berechtigungen steuern.",
     icon: IconUsers,
-    href: "/benutzerverwaltung",
+    href: "/rols",
     moduleKey: "BENUTZERVERWALTUNG",
   },
   {

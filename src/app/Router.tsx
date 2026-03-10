@@ -7,6 +7,8 @@ import { TimeTrackingPage } from "../pages/TimeTrackingPage";
 import { DefaultLayout } from "../components/layout/DefaultLayout";
 import { MinimalLayout } from "../components/layout/MinimalLayout";
 import { BrandingProvider } from "../tenant/BrandingProvider";
+import { RoleManagementPage } from "../pages/roles_rights_management/view_roles";
+import { RoleRightsModuleNav } from "../components/module_navigations/RoleRightsModuleNav";
 //import { PublicWebLayout } from "../components/layout/PublicWebLayout";
 
 const ProtectedRoute = ({ children }: { children: JSX.Element }) => {
@@ -64,6 +66,18 @@ const ProtectedRoute = ({ children }: { children: JSX.Element }) => {
           </ProtectedRoute>
         }
       />
+
+      <Route path="/rols" element={
+        <ProtectedRoute>
+          <BrandingProvider mode="tenant">
+            <DefaultLayout>
+              <RoleRightsModuleNav>
+                <RoleManagementPage />
+              </RoleRightsModuleNav>
+            </DefaultLayout>
+          </BrandingProvider>
+        </ProtectedRoute>
+      }/>
     </Routes>
   </BrowserRouter>
 );
