@@ -192,22 +192,24 @@ function NavItem({
   return button;
 }
 
-// ─── Sidebar Content ──────────────────────────────────────────────────────────
-
-// ─── Collapse Toggle Button (wiederverwendet in header + footer) ──────────────
+// ─── Collapse Toggle ──────────────────────────────────────────────────────────
 
 function CollapseToggle({
   collapsed,
   setCollapsed,
   textColor,
+  // When rendered inside the mobile drawer, the button closes instead of collapsing
+  isDrawer = false,
 }: {
   collapsed: boolean;
   setCollapsed: (v: boolean) => void;
   textColor: string;
+  isDrawer?: boolean;
 }) {
-  const label = collapsed ? "Erweitern" : "Einklappen";
+  const label = isDrawer ? "Schließen" : collapsed ? "Erweitern" : "Einklappen";
+
   return (
-    <Tooltip label={label} position="right" withArrow disabled={!collapsed}>
+    <Tooltip label={label} position="right" withArrow disabled={!collapsed && !isDrawer}>
       <button
         onClick={() => setCollapsed(!collapsed)}
         title={label}
@@ -233,17 +235,16 @@ function CollapseToggle({
           (e.currentTarget as HTMLElement).style.color = hexToRgba(textColor, 0.6);
         }}
       >
-        {/* Doppel-Chevron für mehr Prägnanz */}
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
           stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-          {collapsed ? (
-            // Pfeil nach rechts (aufklappen)
+          {collapsed && !isDrawer ? (
+            // Double chevron right — expand collapsed sidebar
             <>
               <polyline points="13 17 18 12 13 7" />
               <polyline points="6 17 11 12 6 7" />
             </>
           ) : (
-            // Pfeil nach links (einklappen)
+            // Double chevron left — collapse sidebar or close drawer
             <>
               <polyline points="11 17 6 12 11 7" />
               <polyline points="18 17 13 12 18 7" />
@@ -267,6 +268,7 @@ function SidebarContent({
   moduleIcon: ModuleIcon,
   bgColor,
   textColor,
+  isDrawer = false,
 }: {
   navItems: ModuleNavItem[];
   activeKey: string;
@@ -277,6 +279,7 @@ function SidebarContent({
   moduleIcon?: React.FC<{ size?: number; color?: string }>;
   bgColor: string;
   textColor: string;
+  isDrawer?: boolean;
 }) {
   return (
     <div
@@ -288,7 +291,7 @@ function SidebarContent({
         overflow: "hidden",
       }}
     >
-      {/* Module Header — nur wenn expanded */}
+      {/* Module header — only visible when expanded */}
       {!collapsed && (
         <div
           style={{
@@ -317,28 +320,28 @@ function SidebarContent({
               </span>
             )}
             <div style={{ overflow: "hidden" }}>
-                <Text
+              <Text
                 size="sm"
                 fw={700}
                 style={{
-                    color: textColor,
-                    overflow: "hidden",
-                    display: "-webkit-box",
-                    WebkitLineClamp: 2,
-                    WebkitBoxOrient: "vertical",
-                    lineHeight: "1.2em",
-                    maxHeight: "2.4em",
-                    letterSpacing: "0.02em",
+                  color: textColor,
+                  overflow: "hidden",
+                  display: "-webkit-box",
+                  WebkitLineClamp: 2,
+                  WebkitBoxOrient: "vertical",
+                  lineHeight: "1.2em",
+                  maxHeight: "2.4em",
+                  letterSpacing: "0.02em",
                 }}
-                >
+              >
                 {moduleTitle}
-                </Text>
+              </Text>
             </div>
           </div>
         </div>
       )}
 
-      {/* Nav Items */}
+      {/* Nav items */}
       <ScrollArea style={{ flex: 1 }} scrollbarSize={4}>
         <div style={{ paddingTop: 6, paddingBottom: 6 }}>
           {navItems.map((item) => (
@@ -349,10 +352,10 @@ function SidebarContent({
                 </div>
               )}
 
-              {/* Gruppen-Label */}
+              {/* Group label — non-clickable section header */}
               {item.group ? (
                 collapsed ? (
-                  // Im eingeklappten Zustand: nur dünne Trennlinie
+                  // Collapsed: render as thin divider line
                   <div style={{ padding: "6px 12px" }}>
                     <div style={{ height: 1, backgroundColor: hexToRgba(textColor, 0.2) }} />
                   </div>
@@ -386,19 +389,20 @@ function SidebarContent({
         </div>
       </ScrollArea>
 
-      {/* ── Footer: Collapse Toggle immer unten ── */}
+      {/* Footer: collapse toggle always at the bottom */}
       <div style={{ borderTop: `1px solid ${hexToRgba(textColor, 0.12)}`, flexShrink: 0 }}>
         <CollapseToggle
           collapsed={collapsed}
           setCollapsed={setCollapsed}
           textColor={textColor}
+          isDrawer={isDrawer}
         />
       </div>
     </div>
   );
 }
 
-// ─── Main ModuleLayout ────────────────────────────────────────────────────────
+// ─── Main ModuleGenericNav ────────────────────────────────────────────────────
 
 export function ModuleGenericNav({
   children,
@@ -432,7 +436,7 @@ export function ModuleGenericNav({
     <ModuleSidebarContext.Provider value={{ collapsed, setCollapsed }}>
       <div style={{ display: "flex", height: "100%", overflow: "hidden" }}>
 
-        {/* ── Desktop Sidebar ── */}
+        {/* Desktop sidebar */}
         {!isMobile && (
           <div
             style={{
@@ -459,13 +463,13 @@ export function ModuleGenericNav({
           </div>
         )}
 
-        {/* ── Mobile: Floating Toggle Button + Drawer ── */}
+        {/* Mobile: floating tab button + drawer */}
         {isMobile && (
           <>
-            {/* Floating tab on the left edge */}
+            {/* Floating tab on the left edge to open the drawer */}
             <button
               onClick={() => setDrawerOpen(true)}
-              aria-label="Navigation öffnen"
+              aria-label="Open navigation"
               style={{
                 position: "fixed",
                 left: 0,
@@ -483,7 +487,6 @@ export function ModuleGenericNav({
                 justifyContent: "center",
               }}
             >
-              {/* Hamburger icon */}
               <svg
                 width="18"
                 height="18"
@@ -515,17 +518,19 @@ export function ModuleGenericNav({
                 activeKey={activeKey}
                 onNavigate={handleNavigate}
                 collapsed={false}
-                setCollapsed={() => {}}
+                // On mobile the collapse toggle closes the drawer instead
+                setCollapsed={() => setDrawerOpen(false)}
                 moduleTitle={moduleTitle}
                 moduleIcon={moduleIcon}
                 bgColor={bgColor}
                 textColor={textColor}
+                isDrawer={true}
               />
             </Drawer>
           </>
         )}
 
-        {/* ── Page Content ── */}
+        {/* Page content */}
         <div
           style={{
             flex: 1,

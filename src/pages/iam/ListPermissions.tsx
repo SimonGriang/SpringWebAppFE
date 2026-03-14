@@ -10,6 +10,8 @@ import {
 } from "@tabler/icons-react";
 import { AuthContext } from "../../auth/AuthContext";
 import { createApiClient } from "../../api/apiClient";
+import { ModuleContentShell } from "../../components/layout/ModuleContentShell";
+
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -171,118 +173,121 @@ export function PermissionListPage() {
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <Stack gap="lg" p="xl" maw={780} mx="auto">
 
-      {/* Header */}
-      <Group justify="space-between" align="flex-start" wrap="wrap" gap="sm">
-        <Group gap="sm">
-          <ThemeIcon size={40} variant="light" color="secondary" radius="md">
-            <IconLock size={22} />
-          </ThemeIcon>
-          <Box>
-            <Title order={3} fw={600}>Berechtigungen</Title>
+    <ModuleContentShell>
+      <Stack p="xl">
+
+        {/* Header */}
+        <Group justify="space-between" align="flex-start" wrap="wrap" gap="sm">
+          <Group gap="sm">
+            <ThemeIcon size={40} variant="light" color="secondary" radius="md">
+              <IconLock size={22} />
+            </ThemeIcon>
+            <Box>
+              <Title order={3} fw={600}>Berechtigungen</Title>
+              <Text size="sm" c="dimmed">
+                {permissions.length} Berechtigungen im Unternehmen
+              </Text>
+            </Box>
+          </Group>
+        </Group>
+
+        {/* Error */}
+        {error && (
+          <Alert color="red" icon={<IconAlertCircle size={16} />} radius="md"
+            withCloseButton onClose={() => setError(null)}>
+            {error}
+          </Alert>
+        )}
+
+        {/* Filter-Zeile */}
+        <Group gap="sm" wrap="wrap">
+          <TextInput
+            placeholder="Berechtigungen durchsuchen..."
+            leftSection={<IconSearch size={16} />}
+            value={search}
+            onChange={(e) => setSearch(e.currentTarget.value)}
+            radius="md"
+            style={{ flex: 1, minWidth: 200 }}
+          />
+          <Select
+            placeholder="Alle Scopes"
+            data={[
+              { value: "COMPANY",  label: "Unternehmensweit" },
+              { value: "EMPLOYEE", label: "Mitarbeiterbezogen" },
+            ]}
+            value={scopeFilter}
+            onChange={setScopeFilter}
+            clearable
+            radius="md"
+            w={190}
+          />
+        </Group>
+
+        {/* Content */}
+        {loading ? (
+          <Group justify="center" py="xl">
+            <Loader size="sm" color="secondary" />
+            <Text size="sm" c="dimmed">Berechtigungen werden geladen...</Text>
+          </Group>
+        ) : filtered.length === 0 ? (
+          <Paper withBorder p="xl" ta="center" radius="md">
+            <ThemeIcon size={48} variant="light" color="gray" mx="auto" mb="sm">
+              <IconLockOff size={24} />
+            </ThemeIcon>
+            <Text fw={500} mb={4}>Keine Berechtigungen gefunden</Text>
             <Text size="sm" c="dimmed">
-              {permissions.length} Berechtigungen im Unternehmen
+              {search || scopeFilter
+                ? "Versuche einen anderen Suchbegriff oder Filter"
+                : "Das System hat noch keine Berechtigungen generiert"}
             </Text>
-          </Box>
-        </Group>
-      </Group>
+          </Paper>
+        ) : (
+          <Stack gap="xl">
+            {/* Unternehmensweite Berechtigungen */}
+            {companyPerms.length > 0 && (
+              <Box>
+                <Group gap="xs" mb="sm">
+                  <IconBuilding size={13} color="var(--mantine-color-dimmed)" />
+                  <Text size="xs" fw={600} c="dimmed" tt="uppercase" style={{ letterSpacing: 1 }}>
+                    Unternehmensweite Berechtigungen ({companyPerms.length})
+                  </Text>
+                </Group>
+                <Stack gap="xs">
+                  {companyPerms.map((p) => (
+                    <PermissionCard
+                      key={p.id}
+                      permission={p}
+                      onClick={() => navigate(`/rollen/berechtigungen/${p.id}`)}
+                    />
+                  ))}
+                </Stack>
+              </Box>
+            )}
 
-      {/* Error */}
-      {error && (
-        <Alert color="red" icon={<IconAlertCircle size={16} />} radius="md"
-          withCloseButton onClose={() => setError(null)}>
-          {error}
-        </Alert>
-      )}
-
-      {/* Filter-Zeile */}
-      <Group gap="sm" wrap="wrap">
-        <TextInput
-          placeholder="Berechtigungen durchsuchen..."
-          leftSection={<IconSearch size={16} />}
-          value={search}
-          onChange={(e) => setSearch(e.currentTarget.value)}
-          radius="md"
-          style={{ flex: 1, minWidth: 200 }}
-        />
-        <Select
-          placeholder="Alle Scopes"
-          data={[
-            { value: "COMPANY",  label: "Unternehmensweit" },
-            { value: "EMPLOYEE", label: "Mitarbeiterbezogen" },
-          ]}
-          value={scopeFilter}
-          onChange={setScopeFilter}
-          clearable
-          radius="md"
-          w={190}
-        />
-      </Group>
-
-      {/* Content */}
-      {loading ? (
-        <Group justify="center" py="xl">
-          <Loader size="sm" color="secondary" />
-          <Text size="sm" c="dimmed">Berechtigungen werden geladen...</Text>
-        </Group>
-      ) : filtered.length === 0 ? (
-        <Paper withBorder p="xl" ta="center" radius="md">
-          <ThemeIcon size={48} variant="light" color="gray" mx="auto" mb="sm">
-            <IconLockOff size={24} />
-          </ThemeIcon>
-          <Text fw={500} mb={4}>Keine Berechtigungen gefunden</Text>
-          <Text size="sm" c="dimmed">
-            {search || scopeFilter
-              ? "Versuche einen anderen Suchbegriff oder Filter"
-              : "Das System hat noch keine Berechtigungen generiert"}
-          </Text>
-        </Paper>
-      ) : (
-        <Stack gap="xl">
-          {/* Unternehmensweite Berechtigungen */}
-          {companyPerms.length > 0 && (
-            <Box>
-              <Group gap="xs" mb="sm">
-                <IconBuilding size={13} color="var(--mantine-color-dimmed)" />
-                <Text size="xs" fw={600} c="dimmed" tt="uppercase" style={{ letterSpacing: 1 }}>
-                  Unternehmensweite Berechtigungen ({companyPerms.length})
-                </Text>
-              </Group>
-              <Stack gap="xs">
-                {companyPerms.map((p) => (
-                  <PermissionCard
-                    key={p.id}
-                    permission={p}
-                    onClick={() => navigate(`/rollen/berechtigungen/${p.id}`)}
-                  />
-                ))}
-              </Stack>
-            </Box>
-          )}
-
-          {/* Mitarbeiterbezogene Berechtigungen */}
-          {employeePerms.length > 0 && (
-            <Box>
-              <Group gap="xs" mb="sm">
-                <IconUser size={13} color="var(--mantine-color-dimmed)" />
-                <Text size="xs" fw={600} c="dimmed" tt="uppercase" style={{ letterSpacing: 1 }}>
-                  Mitarbeiterbezogene Berechtigungen ({employeePerms.length})
-                </Text>
-              </Group>
-              <Stack gap="xs">
-                {employeePerms.map((p) => (
-                  <PermissionCard
-                    key={p.id}
-                    permission={p}
-                    onClick={() => navigate(`/rollen/berechtigungen/${p.id}`)}
-                  />
-                ))}
-              </Stack>
-            </Box>
-          )}
-        </Stack>
-      )}
-    </Stack>
+            {/* Mitarbeiterbezogene Berechtigungen */}
+            {employeePerms.length > 0 && (
+              <Box>
+                <Group gap="xs" mb="sm">
+                  <IconUser size={13} color="var(--mantine-color-dimmed)" />
+                  <Text size="xs" fw={600} c="dimmed" tt="uppercase" style={{ letterSpacing: 1 }}>
+                    Mitarbeiterbezogene Berechtigungen ({employeePerms.length})
+                  </Text>
+                </Group>
+                <Stack gap="xs">
+                  {employeePerms.map((p) => (
+                    <PermissionCard
+                      key={p.id}
+                      permission={p}
+                      onClick={() => navigate(`/rollen/berechtigungen/${p.id}`)}
+                    />
+                  ))}
+                </Stack>
+              </Box>
+            )}
+          </Stack>
+        )}
+      </Stack>
+    </ModuleContentShell>
   );
 }

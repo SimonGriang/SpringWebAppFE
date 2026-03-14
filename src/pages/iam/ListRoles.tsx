@@ -7,10 +7,12 @@ import {
 import { useDisclosure } from "@mantine/hooks";
 import {
   IconShield, IconShieldOff, IconPlus, IconTrash,
-  IconChevronRight, IconAlertCircle, IconSearch,
+  IconChevronRight, IconAlertCircle, IconSearch, IconUsers,
 } from "@tabler/icons-react";
 import { AuthContext } from "../../auth/AuthContext";
 import { createApiClient } from "../../api/apiClient";
+import { ModuleContentShell } from "../../components/layout/ModuleContentShell";
+
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -23,6 +25,7 @@ interface RoleDto {
   displayName: string;
   description: string;
   permissions: PermissionDTO[];
+  assignedEmployeeCount: number;
 }
 
 // ─── API Hook ─────────────────────────────────────────────────────────────────
@@ -57,7 +60,8 @@ function RoleCard({
   onDelete: () => void;
 }) {
   const [hovered, setHovered] = useState(false);
-
+  const isDeletable = role.assignedEmployeeCount === 0;
+ 
   return (
     <Paper
       withBorder
@@ -83,24 +87,43 @@ function RoleCard({
           <Box style={{ minWidth: 0 }}>
             <Text fw={600} truncate>{role.displayName}</Text>
             <Text size="xs" c="dimmed" truncate>
-              {role.description || "Keine Beschreibung"}
+              {role.description || "No description"}
             </Text>
           </Box>
         </Group>
-
+ 
         {/* Right */}
         <Group gap="xs" wrap="nowrap" style={{ flexShrink: 0 }}>
           <Badge variant="light" color="primary" size="sm" radius="sm">
             {role.permissions.length}{" "}
             {role.permissions.length === 1 ? "Berechtigung" : "Berechtigungen"}
           </Badge>
-          <Tooltip label="Rolle löschen" withArrow>
+ 
+          {/* Show assigned employee count if any */}
+          {role.assignedEmployeeCount > 0 && (
+            <Badge variant="light" color="gray" size="sm" radius="sm" leftSection={<IconUsers size={10} />}>
+              {role.assignedEmployeeCount}
+            </Badge>
+          )}
+ 
+          <Tooltip
+            label={
+              isDeletable
+                ? "Rolle löschen"
+                : `Nicht löschbar – ${role.assignedEmployeeCount} ${role.assignedEmployeeCount === 1 ? "Mitarbeiter" : "Mitarbeitern"} zugewiesen`
+            }
+            withArrow
+          >
             <ActionIcon
               color="red"
               variant="subtle"
               size="sm"
               radius="md"
-              onClick={(e) => { e.stopPropagation(); onDelete(); }}
+              disabled={!isDeletable}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (isDeletable) onDelete();
+              }}
             >
               <IconTrash size={14} />
             </ActionIcon>
@@ -179,88 +202,93 @@ export function RoleManagementPage() {
 
   return (
     <>
-      <Stack gap="lg" p="xl" maw={780} mx="auto">
+      <ModuleContentShell>
+        <Stack p="lg">
 
-        {/* Header */}
-        <Group justify="space-between" align="flex-start">
-          <Group gap="sm">
-            <ThemeIcon size={40} variant="light" color="primary" radius="md">
-              <IconShield size={22} />
-            </ThemeIcon>
-            <Box>
-              <Title order={3} fw={600}>Rollen</Title>
-              <Text size="sm" c="dimmed">
-                {roles.length} {roles.length === 1 ? "Rolle" : "Rollen"} im Unternehmen
+          {/* Header */}
+          <Group justify="space-between" align="flex-start">
+            <Group gap="sm">
+              <ThemeIcon size={40} variant="light" color="primary" radius="md">
+                <IconShield size={22} />
+              </ThemeIcon>
+              <Box>
+                <Title order={3} fw={600}>Rollen</Title>
+                <Text size="sm" c="dimmed">
+                  {roles.length} {roles.length === 1 ? "Rolle" : "Rollen"} im Unternehmen
+                </Text>
+              </Box>
+            </Group>
+          </Group>
+
+          {/* Error */}
+          {error && (
+            <Alert
+              color="red"
+              icon={<IconAlertCircle size={16} />}
+              radius="md"
+              withCloseButton
+              onClose={() => setError(null)}
+            >
+              {error}
+            </Alert>
+          )}
+
+          {/* Search + Create */}
+          <Group gap="sm" wrap="nowrap">
+            <TextInput
+              placeholder="Rollen durchsuchen..."
+              leftSection={<IconSearch size={16} />}
+              value={search}
+              onChange={(e) => setSearch(e.currentTarget.value)}
+              radius="md"
+              style={{ flex: 1 }}
+            />
+            <Button
+              leftSection={<IconPlus size={16} />}
+              radius="md"
+              color="primary"
+              onClick={() => navigate("/rollen/erstellen")}
+              style={{ flexShrink: 0 }}
+            >
+              Neue Rolle
+            </Button>
+          </Group>
+
+          {/* Liste */}
+          {loading ? (
+            <Group justify="center" py="xl">
+              <Loader size="sm" color="primary" />
+              <Text size="sm" c="dimmed">Rollen werden geladen...</Text>
+            </Group>
+          ) : filtered.length === 0 ? (
+            <Paper withBorder p="xl" ta="center" radius="md">
+              <ThemeIcon size={48} variant="light" color="gray" mx="auto" mb="sm">
+                <IconShieldOff size={24} />
+              </ThemeIcon>
+              <Text fw={500} mb={4}>
+                {search ? "Keine Treffer" : "Noch keine Rollen vorhanden"}
               </Text>
-            </Box>
-          </Group>
-          <Button
-            leftSection={<IconPlus size={16} />}
-            radius="md"
-            color="primary"
-            onClick={() => navigate("/rols/create")}
-          >
-            Neue Rolle
-          </Button>
-        </Group>
+              <Text size="sm" c="dimmed">
+                {search
+                  ? `Keine Rolle enthält „${search}"`
+                  : "Erstelle die erste Rolle für dein Unternehmen"}
+              </Text>
+            </Paper>
+          ) : (
+            <Stack gap="sm">
+              {filtered.map((role) => (
+                <RoleCard
+                  key={role.uniqueName}
+                  role={role}
+                  onClick={() => navigate(`/rollen/${encodeURIComponent(role.uniqueName)}`)}
+                  onDelete={() => { setDeleteTarget(role); openDelete(); }}
+                />
+              ))}
+            </Stack>
+          )}
 
-        {/* Error */}
-        {error && (
-          <Alert
-            color="red"
-            icon={<IconAlertCircle size={16} />}
-            radius="md"
-            withCloseButton
-            onClose={() => setError(null)}
-          >
-            {error}
-          </Alert>
-        )}
-
-        {/* Suche */}
-        <TextInput
-          placeholder="Rollen durchsuchen..."
-          leftSection={<IconSearch size={16} />}
-          value={search}
-          onChange={(e) => setSearch(e.currentTarget.value)}
-          radius="md"
-        />
-
-        {/* Liste */}
-        {loading ? (
-          <Group justify="center" py="xl">
-            <Loader size="sm" color="primary" />
-            <Text size="sm" c="dimmed">Rollen werden geladen...</Text>
-          </Group>
-        ) : filtered.length === 0 ? (
-          <Paper withBorder p="xl" ta="center" radius="md">
-            <ThemeIcon size={48} variant="light" color="gray" mx="auto" mb="sm">
-              <IconShieldOff size={24} />
-            </ThemeIcon>
-            <Text fw={500} mb={4}>
-              {search ? "Keine Treffer" : "Noch keine Rollen vorhanden"}
-            </Text>
-            <Text size="sm" c="dimmed">
-              {search
-                ? `Keine Rolle enthält „${search}"`
-                : "Erstelle die erste Rolle für dein Unternehmen"}
-            </Text>
-          </Paper>
-        ) : (
-          <Stack gap="sm">
-            {filtered.map((role) => (
-              <RoleCard
-                key={role.uniqueName}
-                role={role}
-                onClick={() => navigate(`/rollen/${encodeURIComponent(role.uniqueName)}`)}
-                onDelete={() => { setDeleteTarget(role); openDelete(); }}
-              />
-            ))}
-          </Stack>
-        )}
-
-      </Stack>
-
+        </Stack>
+      </ModuleContentShell>
       {/* Delete Modal */}
       <Modal
         opened={deleteOpened}
@@ -280,7 +308,7 @@ export function RoleManagementPage() {
         <Stack gap="md">
           <Alert color="red" radius="md" icon={<IconAlertCircle size={16} />}>
             Die Rolle <strong>{deleteTarget?.displayName}</strong> wird unwiderruflich
-            gelöscht. Alle Zuweisungen an Mitarbeiter gehen dabei verloren.
+            gelöscht. Die Rolle ist keinem Mitarbeiter mehr zugeordnet, somit sind keine Verhaltensänderungen zu erwarten.
           </Alert>
           <Group justify="flex-end">
             <Button variant="light" color="secondary" radius="md" onClick={closeDelete}>
