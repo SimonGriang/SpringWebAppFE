@@ -1,7 +1,6 @@
 import { createContext, useContext } from "react";
 import type { PermissionProfile } from "./authTypes";
 
-
 export type User = {
   sub: string;
   employeeFirstname: string;
@@ -15,7 +14,9 @@ export type AuthContextType = {
   user: User | null;
   permissionProfile: PermissionProfile | null;
   login: (token: string, permissionProfile: PermissionProfile) => void;
-  logout: () => void;
+  logout: () => Promise<void>;
+  // Called by apiClient when it silently refreshed the token mid-request
+  updateToken: (newToken: string) => void;
 };
 
 export const AuthContext = createContext<AuthContextType>(null!);

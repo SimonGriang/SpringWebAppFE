@@ -1,8 +1,7 @@
 import { MantineProvider, type MantineThemeOverride, type MantineColorsTuple } from "@mantine/core";
-import { useContext, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { BrandingContext, type Branding } from "./BrandingContext";
-import { AuthContext } from "../auth/AuthContext";
-import { createApiClient } from "../api/apiClient";
+import { useApiClient } from "../api/useApiClient";
 import tinycolor from "tinycolor2";
 
 const generateColorScale = (hex: string): MantineColorsTuple => {
@@ -25,11 +24,9 @@ export const BrandingProvider: React.FC<{
   children: React.ReactNode;
   mode: "standard" | "tenant";
 }> = ({ children, mode }) => {
-  const { token } = useContext(AuthContext);
+  const apiClient = useApiClient();
   const [branding, setBranding] = useState<Branding | null>(null);
   const [loading, setLoading] = useState(true);
-
-  const apiClient = createApiClient(() => token);
 
 
   const STANDARD_BRANDING: Branding = {
@@ -64,15 +61,8 @@ export const BrandingProvider: React.FC<{
     setLoading(true);
 
 
-    /* 🔴 FIX: expliziter Standard-Modus */
+    /* Tenant mode without token falls back to standard branding */
     if (mode === "standard") {
-      setBranding(STANDARD_BRANDING);
-      setLoading(false);
-      return;
-    }
-
-    /* 🔴 FIX: Tenant-Modus ohne Token → Fallback */
-    if (!token) {
       setBranding(STANDARD_BRANDING);
       setLoading(false);
       return;
@@ -106,7 +96,7 @@ export const BrandingProvider: React.FC<{
 
   useEffect(() => {
     loadBranding();
-  }, [token, mode]);
+  }, [mode]);
 
   const theme: MantineThemeOverride | undefined = branding
     ? {

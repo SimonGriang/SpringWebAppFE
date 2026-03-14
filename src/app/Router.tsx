@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { type JSX } from "react";
 import { useAuth } from "../auth/AuthContext";
+import { decodeJwt } from "../auth/jwtDecode";
 import { LoginPage } from "../pages/LoginPage";
 import { DashboardPage } from "../pages/DashboardPage";
 import { TimeTrackingPage } from "../pages/TimeTrackingPage";
@@ -12,11 +13,23 @@ import { RoleRightsModuleNav } from "../components/module_navigations/RoleRights
 import { CreateRolePage } from "../pages/iam/CreateRole";
 import { DetailRolePage } from "../pages/iam/DetailsRole";
 import { PermissionListPage } from "../pages/iam/ListPermissions";
-//import { PublicWebLayout } from "../components/layout/PublicWebLayout";
+
+// Returns true if the token exists and is not yet expired
+function isTokenValid(token: string | null): boolean {
+  if (!token) return false;
+  try {
+    const payload = decodeJwt(token);
+    // Add a 5-second buffer to avoid edge cases where the token expires
+    // between this check and the actual API request
+    return payload.exp * 1000 > Date.now() + 5000;
+  } catch {
+    return false;
+  }
+}
 
 const ProtectedRoute = ({ children }: { children: JSX.Element }) => {
   const { token } = useAuth();
-  if (!token) {
+  if (!isTokenValid(token)) {
     return <Navigate to="/login" replace />;
   }
   return children;
