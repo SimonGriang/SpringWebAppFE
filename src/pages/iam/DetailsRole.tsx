@@ -1,18 +1,19 @@
-import { useState, useEffect, useCallback, useContext } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   Stack, Group, Box, Text, Title, Button, Paper, ThemeIcon,
-  Badge, ActionIcon, Alert, Loader, Divider, Tabs, Checkbox,
-  Modal, Avatar, TextInput, Tooltip, ScrollArea,
+  Badge, ActionIcon, Alert, Loader, Divider, Table, ScrollArea,
+  TextInput, Modal, Checkbox,
 } from "@mantine/core";
 import { useDisclosure } from "@mantine/hooks";
 import {
-  IconShieldCheck, IconShieldOff, IconArrowLeft, IconAlertCircle,
-  IconLock, IconBuilding, IconUser, IconUsers, IconCheck,
-  IconTrash, IconSearch, IconPlus, IconDeviceFloppy,
+  IconShield, IconShieldOff, IconArrowLeft, IconAlertCircle,
+  IconTrash, IconSearch, IconPlus, IconLock, IconUsers,
+  IconUserMinus, IconUserPlus, IconX,
 } from "@tabler/icons-react";
-import { AuthContext } from "../../auth/AuthContext";
-import { createApiClient } from "../../api/apiClient";
+import { useApiClient } from "../../api/useApiClient";
+import { useAuth } from "../../auth/AuthContext";
+import { ModuleContentShell } from "../../components/layout/ModuleContentShell";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -31,6 +32,7 @@ interface RoleDto {
   displayName: string;
   description: string;
   permissions: PermissionDTO[];
+  assignedEmployeeCount: number;
 }
 
 interface EmployeeDto {
@@ -42,23 +44,23 @@ interface EmployeeDto {
 
 // ─── API Hook ─────────────────────────────────────────────────────────────────
 
-function useDetailApi() {
-  const { token } = useContext(AuthContext);
-  const api = createApiClient(() => token);
+function useRoleDetailApi() {
+  const api = useApiClient();
 
   const getRoles = useCallback(
     (): Promise<RoleDto[]> => api("/backend/api/roles"),
-    [token]
+    [api]
   );
 
   const getPermissions = useCallback(
     (): Promise<PermissionDTO[]> => api("/backend/api/roles/permissions"),
-    [token]
+    [api]
   );
 
   const getEmployees = useCallback(
-    (): Promise<EmployeeDto[]> => api("/backend/api/employees"),
-    [token]
+    (roleName: string): Promise<EmployeeDto[]> =>
+      api(`/backend/api/roles/${encodeURIComponent(roleName)}/employees`),
+    [api]
   );
 
   const setPermissions = useCallback(
@@ -67,7 +69,7 @@ function useDetailApi() {
         method: "PUT",
         body: JSON.stringify(ids),
       }),
-    [token]
+    [api]
   );
 
   const assignEmployee = useCallback(
@@ -76,7 +78,7 @@ function useDetailApi() {
         method: "POST",
         body: JSON.stringify({ employeeId }),
       }),
-    [token]
+    [api]
   );
 
   const removeEmployee = useCallback(
@@ -84,347 +86,311 @@ function useDetailApi() {
       api(`/backend/api/roles/${encodeURIComponent(roleName)}/employees/${employeeId}`, {
         method: "DELETE",
       }),
-    [token]
+    [api]
   );
 
   const deleteRole = useCallback(
     (roleName: string): Promise<void> =>
-      api(`/backend/api/roles/${encodeURIComponent(roleName)}`, {
-        method: "DELETE",
-      }),
-    [token]
+      api(`/backend/api/roles/${encodeURIComponent(roleName)}`, { method: "DELETE" }),
+    [api]
   );
 
   return { getRoles, getPermissions, getEmployees, setPermissions, assignEmployee, removeEmployee, deleteRole };
 }
 
-// ─── Shared: ScopeBadge ───────────────────────────────────────────────────────
+// ─── Sub-Component: Manage Permissions Modal ──────────────────────────────────
 
-function ScopeBadge({ scope }: { scope: PermissionScope }) {
-  return scope === "COMPANY" ? (
-    <Badge color="secondary" variant="light" size="xs" leftSection={<IconBuilding size={9} />}>
-      Unternehmen
-    </Badge>
-  ) : (
-    <Badge color="accent" variant="light" size="xs" leftSection={<IconUser size={9} />}>
-      Mitarbeiter
-    </Badge>
-  );
-}
-
-// ─── Tab: Berechtigungen ──────────────────────────────────────────────────────
-
-function PermissionsTab({
+function ManagePermissionsModal({
+  opened,
+  onClose,
   role,
   allPermissions,
-  onSave,
+  onSaved,
 }: {
+  opened: boolean;
+  onClose: () => void;
   role: RoleDto;
   allPermissions: PermissionDTO[];
-  onSave: (ids: number[]) => Promise<void>;
+  onSaved: () => void;
 }) {
-  const [selected, setSelected] = useState<Set<number>>(
-    new Set(role.permissions.map((p) => p.id))
-  );
-  const [saving, setSaving] = useState(false);
-  const [success, setSuccess] = useState(false);
+  const { setPermissions } = useRoleDetailApi();
+  const [selected, setSelected] = useState<Set<number>>(new Set(role.permissions.map((p) => p.id)));
   const [search, setSearch] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const toggle = (id: number, checked: boolean) => {
+  useEffect(() => {
+    if (opened) {
+      setSelected(new Set(role.permissions.map((p) => p.id)));
+      setSearch("");
+      setError(null);
+    }
+  }, [opened, role]);
+
+  const filtered = allPermissions.filter(
+    (p) =>
+      p.resolvedLabel.toLowerCase().includes(search.toLowerCase()) ||
+      p.permissionKey.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const companyPerms = filtered.filter((p) => p.scope === "COMPANY");
+  const employeePerms = filtered.filter((p) => p.scope === "EMPLOYEE");
+
+  const toggle = (id: number) => {
     setSelected((prev) => {
       const next = new Set(prev);
-      checked ? next.add(id) : next.delete(id);
+      next.has(id) ? next.delete(id) : next.add(id);
       return next;
     });
-    setSuccess(false);
   };
 
   const handleSave = async () => {
     setSaving(true);
+    setError(null);
     try {
-      await onSave(Array.from(selected));
-      setSuccess(true);
-      setTimeout(() => setSuccess(false), 2500);
+      await setPermissions(role.uniqueName, Array.from(selected));
+      onSaved();
+      onClose();
+    } catch (e: any) {
+      setError(e?.message ?? "Permissions could not be saved");
     } finally {
       setSaving(false);
     }
   };
 
-  const companyPerms = allPermissions.filter(
-    (p) => p.scope === "COMPANY" &&
-      (p.resolvedLabel.toLowerCase().includes(search.toLowerCase()) ||
-        p.permissionKey.toLowerCase().includes(search.toLowerCase()))
-  );
-  const employeePerms = allPermissions.filter(
-    (p) => p.scope === "EMPLOYEE" &&
-      (p.resolvedLabel.toLowerCase().includes(search.toLowerCase()) ||
-        p.permissionKey.toLowerCase().includes(search.toLowerCase()))
-  );
-
   const changedCount = (() => {
     const original = new Set(role.permissions.map((p) => p.id));
-    const added = [...selected].filter((id) => !original.has(id)).length;
-    const removed = [...original].filter((id) => !selected.has(id)).length;
-    return added + removed;
+    return [...selected].filter((id) => !original.has(id)).length +
+           [...original].filter((id) => !selected.has(id)).length;
   })();
 
-  return (
-    <Stack gap="md">
-      <TextInput
-        placeholder="Berechtigungen durchsuchen..."
-        leftSection={<IconSearch size={16} />}
-        value={search}
-        onChange={(e) => setSearch(e.currentTarget.value)}
-        radius="md"
-      />
-
-      <ScrollArea mah={480} offsetScrollbars>
-        <Stack gap="xl">
-          {companyPerms.length > 0 && (
-            <Box>
-              <Group gap="xs" mb="sm">
-                <IconBuilding size={13} color="var(--mantine-color-dimmed)" />
-                <Text size="xs" fw={600} c="dimmed" tt="uppercase" style={{ letterSpacing: 1 }}>
-                  Unternehmensweite Berechtigungen
-                </Text>
+  const PermGroup = ({ perms, label }: { perms: PermissionDTO[]; label: string }) =>
+    perms.length === 0 ? null : (
+      <Box>
+        <Text size="xs" fw={600} c="dimmed" tt="uppercase" mb="xs" style={{ letterSpacing: 1 }}>
+          {label}
+        </Text>
+        <Stack gap="xs">
+          {perms.map((p) => (
+            <Paper
+              key={p.id}
+              withBorder
+              p="sm"
+              radius="md"
+              style={{
+                cursor: "pointer",
+                borderColor: selected.has(p.id)
+                  ? "var(--mantine-color-primary-4)"
+                  : "var(--mantine-color-default-border)",
+                backgroundColor: selected.has(p.id)
+                  ? "var(--mantine-color-primary-0)"
+                  : undefined,
+                transition: "all 0.12s",
+              }}
+              onClick={() => toggle(p.id)}
+            >
+              <Group gap="sm" wrap="nowrap">
+                <Checkbox
+                  checked={selected.has(p.id)}
+                  onChange={() => toggle(p.id)}
+                  onClick={(e) => e.stopPropagation()}
+                  radius="sm"
+                  color="primary"
+                />
+                <Box style={{ minWidth: 0, flex: 1 }}>
+                  <Text size="sm" fw={500} truncate>{p.resolvedLabel}</Text>
+                  <Text size="xs" c="dimmed" ff="monospace" truncate>{p.permissionKey}</Text>
+                </Box>
+                <Badge
+                  size="xs"
+                  variant="light"
+                  color={p.scope === "COMPANY" ? "secondary" : "primary"}
+                  style={{ flexShrink: 0 }}
+                >
+                  {p.scope === "COMPANY" ? "Company" : "Employee"}
+                </Badge>
               </Group>
-              <Stack gap="xs">
-                {companyPerms.map((p) => (
-                  <Paper
-                    key={p.id}
-                    withBorder
-                    p="sm"
-                    radius="md"
-                    style={{
-                      borderColor: selected.has(p.id)
-                        ? "var(--mantine-color-primary-4)"
-                        : "var(--mantine-color-default-border)",
-                      backgroundColor: selected.has(p.id)
-                        ? "var(--mantine-color-primary-0)"
-                        : undefined,
-                      cursor: "pointer",
-                      transition: "all 0.12s",
-                    }}
-                    onClick={() => toggle(p.id, !selected.has(p.id))}
-                  >
-                    <Group gap="sm" wrap="nowrap">
-                      <Checkbox
-                        checked={selected.has(p.id)}
-                        onChange={(e) => toggle(p.id, e.currentTarget.checked)}
-                        onClick={(e) => e.stopPropagation()}
-                        radius="sm"
-                        color="primary"
-                      />
-                      <Box style={{ flex: 1, minWidth: 0 }}>
-                        <Text size="sm" fw={500} truncate>{p.resolvedLabel}</Text>
-                        <Text size="xs" c="dimmed" ff="monospace" truncate>{p.permissionKey}</Text>
-                      </Box>
-                      <ScopeBadge scope={p.scope} />
-                    </Group>
-                  </Paper>
-                ))}
-              </Stack>
-            </Box>
-          )}
-
-          {employeePerms.length > 0 && (
-            <Box>
-              <Group gap="xs" mb="sm">
-                <IconUser size={13} color="var(--mantine-color-dimmed)" />
-                <Text size="xs" fw={600} c="dimmed" tt="uppercase" style={{ letterSpacing: 1 }}>
-                  Mitarbeiterbezogene Berechtigungen
-                </Text>
-              </Group>
-              <Stack gap="xs">
-                {employeePerms.map((p) => (
-                  <Paper
-                    key={p.id}
-                    withBorder
-                    p="sm"
-                    radius="md"
-                    style={{
-                      borderColor: selected.has(p.id)
-                        ? "var(--mantine-color-primary-4)"
-                        : "var(--mantine-color-default-border)",
-                      backgroundColor: selected.has(p.id)
-                        ? "var(--mantine-color-primary-0)"
-                        : undefined,
-                      cursor: "pointer",
-                      transition: "all 0.12s",
-                    }}
-                    onClick={() => toggle(p.id, !selected.has(p.id))}
-                  >
-                    <Group gap="sm" wrap="nowrap">
-                      <Checkbox
-                        checked={selected.has(p.id)}
-                        onChange={(e) => toggle(p.id, e.currentTarget.checked)}
-                        onClick={(e) => e.stopPropagation()}
-                        radius="sm"
-                        color="primary"
-                      />
-                      <Box style={{ flex: 1, minWidth: 0 }}>
-                        <Text size="sm" fw={500} truncate>{p.resolvedLabel}</Text>
-                        <Text size="xs" c="dimmed" ff="monospace" truncate>{p.permissionKey}</Text>
-                      </Box>
-                      <ScopeBadge scope={p.scope} />
-                    </Group>
-                  </Paper>
-                ))}
-              </Stack>
-            </Box>
-          )}
-
-          {companyPerms.length === 0 && employeePerms.length === 0 && (
-            <Text c="dimmed" size="sm" ta="center" py="xl">
-              Keine Berechtigungen gefunden
-            </Text>
-          )}
+            </Paper>
+          ))}
         </Stack>
-      </ScrollArea>
+      </Box>
+    );
 
-      {/* Speichern */}
-      <Divider />
-      <Group>
-        <Button
-          onClick={handleSave}
-          loading={saving}
-          leftSection={success ? <IconCheck size={16} /> : <IconDeviceFloppy size={16} />}
+  return (
+    <Modal
+      opened={opened}
+      onClose={onClose}
+      title={
+        <Group gap="sm">
+          <ThemeIcon size="md" variant="light" color="primary" radius="md">
+            <IconLock size={15} />
+          </ThemeIcon>
+          <Text fw={600}>Berechtigungen verwalten</Text>
+        </Group>
+      }
+      centered
+      size="lg"
+      radius="md"
+    >
+      <Stack gap="md">
+        {error && <Alert color="red" icon={<IconAlertCircle size={14} />} radius="md">{error}</Alert>}
+
+        <TextInput
+          placeholder="Berechtigungen suchen..."
+          leftSection={<IconSearch size={16} />}
+          value={search}
+          onChange={(e) => setSearch(e.currentTarget.value)}
           radius="md"
-          color={success ? "green" : "primary"}
-          disabled={changedCount === 0}
-        >
-          {success
-            ? "Gespeichert"
-            : changedCount > 0
-            ? `${changedCount} Änderung${changedCount > 1 ? "en" : ""} speichern`
-            : "Keine Änderungen"}
-        </Button>
-      </Group>
-    </Stack>
+        />
+
+        <ScrollArea mah={400} offsetScrollbars>
+          <Stack gap="lg">
+            <PermGroup perms={companyPerms} label="Unternehmensweite Berechtigungen" />
+            <PermGroup perms={employeePerms} label="Mitarbeiterbezogene Berechtigungen" />
+            {filtered.length === 0 && (
+              <Text size="sm" c="dimmed" ta="center" py="md">Keine Berechtigungen gefunden</Text>
+            )}
+          </Stack>
+        </ScrollArea>
+
+        <Divider />
+
+        <Group justify="space-between" align="center">
+          <Text size="xs" c="dimmed">
+            {changedCount > 0 ? `${changedCount} ungespeicherte Änderung${changedCount > 1 ? "en" : ""}` : "Keine Änderungen"}
+          </Text>
+          <Group>
+            <Button variant="light" color="secondary" radius="md" onClick={onClose}>Abbrechen</Button>
+            <Button
+              color="primary"
+              radius="md"
+              loading={saving}
+              disabled={changedCount === 0}
+              onClick={handleSave}
+            >
+              Speichern
+            </Button>
+          </Group>
+        </Group>
+      </Stack>
+    </Modal>
   );
 }
 
-// ─── Tab: Mitarbeiter ─────────────────────────────────────────────────────────
+// ─── Sub-Component: Assign Employee Modal ─────────────────────────────────────
 
-function EmployeesTab({
+function AssignEmployeeModal({
+  opened,
+  onClose,
   role,
   allEmployees,
-  onAssign,
-  onRemove,
+  assignedIds,
+  onAssigned,
 }: {
+  opened: boolean;
+  onClose: () => void;
   role: RoleDto;
   allEmployees: EmployeeDto[];
-  onAssign: (employeeId: number) => Promise<void>;
-  onRemove: (employeeId: number) => Promise<void>;
+  assignedIds: Set<number>;
+  onAssigned: () => void;
 }) {
-  // Vereinfacht: "zugewiesen" tracken wir lokal bis zum nächsten Reload
-  // In Produktion: Employee-Liste aus der Rolle selbst wenn das Backend sie liefert
-  const [assignedIds, setAssignedIds] = useState<Set<number>>(new Set());
+  const { assignEmployee } = useRoleDetailApi();
   const [search, setSearch] = useState("");
-  const [loadingId, setLoadingId] = useState<number | null>(null);
+  const [assigningId, setAssigningId] = useState<number | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  const filtered = allEmployees.filter((e) =>
-    `${e.firstname} ${e.surname} ${e.employeeNumber}`
-      .toLowerCase()
-      .includes(search.toLowerCase())
+  useEffect(() => {
+    if (opened) { setSearch(""); setError(null); }
+  }, [opened]);
+
+  const assignable = allEmployees.filter(
+    (e) =>
+      !assignedIds.has(e.id) &&
+      `${e.firstname} ${e.surname} ${e.employeeNumber}`.toLowerCase().includes(search.toLowerCase())
   );
 
   const handleAssign = async (emp: EmployeeDto) => {
-    setLoadingId(emp.id);
+    setAssigningId(emp.id);
+    setError(null);
     try {
-      await onAssign(emp.id);
-      setAssignedIds((prev) => new Set(prev).add(emp.id));
+      await assignEmployee(role.uniqueName, emp.id);
+      onAssigned();
+      onClose();
+    } catch (e: any) {
+      setError(e?.message ?? "Assignment failed");
     } finally {
-      setLoadingId(null);
-    }
-  };
-
-  const handleRemove = async (emp: EmployeeDto) => {
-    setLoadingId(emp.id);
-    try {
-      await onRemove(emp.id);
-      setAssignedIds((prev) => {
-        const next = new Set(prev);
-        next.delete(emp.id);
-        return next;
-      });
-    } finally {
-      setLoadingId(null);
+      setAssigningId(null);
     }
   };
 
   return (
-    <Stack gap="md">
-      <TextInput
-        placeholder="Mitarbeiter suchen..."
-        leftSection={<IconSearch size={16} />}
-        value={search}
-        onChange={(e) => setSearch(e.currentTarget.value)}
-        radius="md"
-      />
+    <Modal
+      opened={opened}
+      onClose={onClose}
+      title={
+        <Group gap="sm">
+          <ThemeIcon size="md" variant="light" color="primary" radius="md">
+            <IconUserPlus size={15} />
+          </ThemeIcon>
+          <Text fw={600}>Mitarbeiter zuweisen</Text>
+        </Group>
+      }
+      centered
+      size="md"
+      radius="md"
+    >
+      <Stack gap="md">
+        <Text size="sm" c="dimmed">Nur Mitarbeiter ohne diese Rolle werden angezeigt.</Text>
 
-      <ScrollArea mah={480} offsetScrollbars>
-        <Stack gap="xs">
-          {filtered.length === 0 ? (
-            <Text c="dimmed" size="sm" ta="center" py="xl">
-              Keine Mitarbeiter gefunden
+        <TextInput
+          placeholder="Mitarbeiter suchen..."
+          leftSection={<IconSearch size={16} />}
+          value={search}
+          onChange={(e) => setSearch(e.currentTarget.value)}
+          radius="md"
+        />
+
+        {error && <Alert color="red" icon={<IconAlertCircle size={14} />} radius="md">{error}</Alert>}
+
+        <ScrollArea mah={320} offsetScrollbars>
+          {assignable.length === 0 ? (
+            <Text size="sm" c="dimmed" ta="center" py="md">
+              {search ? "Keine Treffer" : "Alle Mitarbeiter haben diese Rolle bereits"}
             </Text>
           ) : (
-            filtered.map((emp) => {
-              const isAssigned = assignedIds.has(emp.id);
-              const isLoading = loadingId === emp.id;
-              return (
+            <Stack gap="xs">
+              {assignable.map((emp) => (
                 <Paper key={emp.id} withBorder p="sm" radius="md">
                   <Group justify="space-between" wrap="nowrap">
                     <Group gap="sm" wrap="nowrap" style={{ minWidth: 0 }}>
-                      <Avatar
-                        size="sm"
-                        radius="xl"
-                        color="primary"
-                        variant="light"
-                      >
-                        {emp.firstname[0]}{emp.surname[0]}
-                      </Avatar>
+                      <ThemeIcon size={30} variant="light" color="primary" radius="md" style={{ flexShrink: 0 }}>
+                        <Text size="xs" fw={700}>{emp.firstname[0]}{emp.surname[0]}</Text>
+                      </ThemeIcon>
                       <Box style={{ minWidth: 0 }}>
-                        <Text size="sm" fw={500} truncate>
-                          {emp.firstname} {emp.surname}
-                        </Text>
+                        <Text size="sm" fw={500} truncate>{emp.firstname} {emp.surname}</Text>
                         <Text size="xs" c="dimmed">{emp.employeeNumber}</Text>
                       </Box>
                     </Group>
-                    {isAssigned ? (
-                      <Button
-                        size="xs"
-                        variant="light"
-                        color="red"
-                        radius="md"
-                        loading={isLoading}
-                        leftSection={<IconTrash size={12} />}
-                        onClick={() => handleRemove(emp)}
-                      >
-                        Entfernen
-                      </Button>
-                    ) : (
-                      <Button
-                        size="xs"
-                        variant="light"
-                        color="primary"
-                        radius="md"
-                        loading={isLoading}
-                        leftSection={<IconPlus size={12} />}
-                        onClick={() => handleAssign(emp)}
-                      >
-                        Zuweisen
-                      </Button>
-                    )}
+                    <Button
+                      size="xs"
+                      variant="light"
+                      color="primary"
+                      radius="md"
+                      loading={assigningId === emp.id}
+                      leftSection={<IconPlus size={12} />}
+                      onClick={() => handleAssign(emp)}
+                      style={{ flexShrink: 0 }}
+                    >
+                      Zuweisen
+                    </Button>
                   </Group>
                 </Paper>
-              );
-            })
+              ))}
+            </Stack>
           )}
-        </Stack>
-      </ScrollArea>
-    </Stack>
+        </ScrollArea>
+      </Stack>
+    </Modal>
   );
 }
 
@@ -433,70 +399,104 @@ function EmployeesTab({
 export function DetailRolePage() {
   const { roleName } = useParams<{ roleName: string }>();
   const navigate = useNavigate();
-  const { getRoles, getPermissions, getEmployees, setPermissions, assignEmployee, removeEmployee, deleteRole } =
-    useDetailApi();
+  const { permissionProfile } = useAuth();
+  const { getRoles, getPermissions, getEmployees, removeEmployee, deleteRole, setPermissions } = useRoleDetailApi();
 
   const [role, setRole] = useState<RoleDto | null>(null);
   const [allPermissions, setAllPermissions] = useState<PermissionDTO[]>([]);
   const [allEmployees, setAllEmployees] = useState<EmployeeDto[]>([]);
+  const [assignedEmployees, setAssignedEmployees] = useState<EmployeeDto[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [deleteOpened, { open: openDelete, close: closeDelete }] = useDisclosure(false);
+  const [permModalOpened, { open: openPermModal, close: closePermModal }] = useDisclosure(false);
+  const [assignModalOpened, { open: openAssignModal, close: closeAssignModal }] = useDisclosure(false);
+  const [deleteModalOpened, { open: openDeleteModal, close: closeDeleteModal }] = useDisclosure(false);
+  const [removingId, setRemovingId] = useState<number | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
 
-  // ── Laden ─────────────────────────────────────────────────────────────────
+  // ── Permission guard ──────────────────────────────────────────────────────
+
+  const canManage = permissionProfile?.companyPermissions.includes("ROLE_MANAGE");
+  const canView =
+    canManage || permissionProfile?.companyPermissions.includes("ROLE_VIEW");
+
+  // ── Load ──────────────────────────────────────────────────────────────────
 
   const load = useCallback(async () => {
-    if (!roleName) return;
+    if (!roleName || !canView) return;
     setLoading(true);
     setError(null);
     try {
-      const [roles, perms, emps] = await Promise.all([
+      const decodedName = decodeURIComponent(roleName);
+      const [roles, perms, assignedEmps] = await Promise.all([
         getRoles(),
         getPermissions(),
-        getEmployees(),
+        getEmployees(decodedName),
       ]);
-      const found = roles.find((r) => r.uniqueName === decodeURIComponent(roleName));
-      if (!found) throw new Error("Rolle nicht gefunden");
+      const found = roles.find((r) => r.uniqueName === decodedName);
+      if (!found) throw new Error("Role not found");
       setRole(found);
       setAllPermissions(perms);
-      setAllEmployees(emps);
+      setAssignedEmployees(assignedEmps);
+      // allEmployees for the assign modal: load all from roles endpoint workaround
+      // until a dedicated /api/employees endpoint exists
+      setAllEmployees([]);
     } catch (e: any) {
-      setError(e?.message ?? "Daten konnten nicht geladen werden");
+      setError(e?.message ?? "Role could not be loaded");
     } finally {
       setLoading(false);
     }
-  }, [roleName]);
+  }, [roleName, canView]);
 
   useEffect(() => { load(); }, [load]);
 
-  // ── Aktionen ──────────────────────────────────────────────────────────────
+  // ── Actions ───────────────────────────────────────────────────────────────
 
-  const handleSavePermissions = async (ids: number[]) => {
+  const handleRemoveEmployee = async (emp: EmployeeDto) => {
     if (!role) return;
-    await setPermissions(role.uniqueName, ids);
-    await load(); // Rolle neu laden damit Permissions aktuell sind
+    setRemovingId(emp.id);
+    try {
+      await removeEmployee(role.uniqueName, emp.id);
+      await load();
+    } catch (e: any) {
+      setError(e?.message ?? "Could not remove employee");
+    } finally {
+      setRemovingId(null);
+    }
   };
 
-  const handleDeleteConfirm = async () => {
+  const handleDeleteRole = async () => {
     if (!role) return;
     setDeleteLoading(true);
     try {
       await deleteRole(role.uniqueName);
-      navigate("/rollen");
+      navigate("/iam/roles");
     } catch (e: any) {
-      setError(e?.message ?? "Löschen fehlgeschlagen");
+      setError(e?.message ?? "Role could not be deleted");
       setDeleteLoading(false);
-      closeDelete();
+      closeDeleteModal();
     }
   };
 
-  // ── Render: Loading / Error ───────────────────────────────────────────────
+  // ── Guards ────────────────────────────────────────────────────────────────
+
+  if (!canView) {
+    return (
+      <Box p="xl" maw={580} mx="auto">
+        <Alert color="red" icon={<IconShieldOff size={18} />} radius="md" title="Keine Berechtigung">
+          Du hast keine Berechtigung, Rollen einzusehen. Wende dich an einen Administrator.
+        </Alert>
+        <Button mt="md" variant="light" color="secondary" radius="md" leftSection={<IconArrowLeft size={16} />} onClick={() => navigate("/dashboard")}>
+          Zum Dashboard
+        </Button>
+      </Box>
+    );
+  }
 
   if (loading) {
     return (
-      <Group justify="center" align="center" style={{ height: "100%" }} p="xl">
+      <Group justify="center" align="center" p="xl" style={{ height: "100%" }}>
         <Loader size="sm" color="primary" />
         <Text size="sm" c="dimmed">Rolle wird geladen...</Text>
       </Group>
@@ -507,122 +507,303 @@ export function DetailRolePage() {
     return (
       <Box p="xl" maw={580} mx="auto">
         <Alert color="red" icon={<IconAlertCircle size={16} />} radius="md">
-          {error ?? "Rolle konnte nicht geladen werden"}
+          {error ?? "Role could not be loaded"}
         </Alert>
-        <Button
-          mt="md"
-          variant="light"
-          color="secondary"
-          radius="md"
-          leftSection={<IconArrowLeft size={16} />}
-          onClick={() => navigate("/rollen")}
-        >
+        <Button mt="md" variant="light" color="secondary" radius="md" leftSection={<IconArrowLeft size={16} />} onClick={() => navigate("/iam/roles")}>
           Zurück zur Übersicht
         </Button>
       </Box>
     );
   }
 
-  // ── Render: Detail ────────────────────────────────────────────────────────
+  const isDeletable = role.assignedEmployeeCount === 0;
+  const assignedIds = new Set(assignedEmployees.map((e) => e.id));
+
+  // ── Render ────────────────────────────────────────────────────────────────
 
   return (
     <>
-      <Box p="xl" maw={780} mx="auto">
+      <ModuleContentShell p="xl">
         <Stack gap="lg">
 
-          {/* ── Header ── */}
-          <Group justify="space-between" align="flex-start" wrap="nowrap">
-            <Group gap="sm" wrap="nowrap" style={{ minWidth: 0 }}>
-              <ActionIcon
-                variant="light"
-                color="secondary"
-                size="lg"
-                radius="md"
-                onClick={() => navigate("/rollen")}
-                style={{ flexShrink: 0 }}
-              >
-                <IconArrowLeft size={18} />
-              </ActionIcon>
-              <Group gap="sm" wrap="nowrap" style={{ minWidth: 0 }}>
-                <ThemeIcon size={40} variant="light" color="primary" radius="md" style={{ flexShrink: 0 }}>
-                  <IconShieldCheck size={22} />
-                </ThemeIcon>
-                <Box style={{ minWidth: 0, overflow: "hidden" }}>
-                  <Title order={3} fw={600} style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    {role.displayName}
-                  </Title>
-                  <Text size="xs" c="dimmed" ff="monospace" truncate>{role.uniqueName}</Text>
-                </Box>
-              </Group>
-            </Group>
-            <Tooltip label="Rolle löschen" withArrow>
-              <ActionIcon
-                color="red"
-                variant="light"
-                size="lg"
-                radius="md"
-                onClick={openDelete}
-                style={{ flexShrink: 0 }}
-              >
-                <IconTrash size={18} />
-              </ActionIcon>
-            </Tooltip>
+          {/* Header */}
+          <Group gap="sm" wrap="nowrap">
+            <ActionIcon variant="light" color="secondary" size="lg" radius="md"
+              onClick={() => navigate("/iam/roles")} style={{ flexShrink: 0 }}>
+              <IconArrowLeft size={18} />
+            </ActionIcon>
+            <ThemeIcon size={40} variant="light" color="primary" radius="md" style={{ flexShrink: 0 }}>
+              <IconShield size={22} />
+            </ThemeIcon>
+            <Box style={{ minWidth: 0 }}>
+              <Title order={3} fw={600}
+                style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {role.displayName}
+              </Title>
+              <Text size="xs" c="dimmed" ff="monospace" truncate>{role.uniqueName}</Text>
+            </Box>
           </Group>
-
-          {/* ── Beschreibung ── */}
-          {role.description && (
-            <Paper withBorder p="md" radius="md" bg="var(--mantine-color-default-hover)">
-              <Text size="sm">{role.description}</Text>
-            </Paper>
-          )}
 
           <Divider />
 
-          {/* ── Tabs ── */}
-          <Tabs defaultValue="permissions" radius="md">
-            <Tabs.List>
-              <Tabs.Tab
-                value="permissions"
-                leftSection={<IconLock size={15} />}
-              >
-                Berechtigungen
-                <Badge ml="xs" size="xs" variant="light" color="primary" radius="sm">
+          {error && (
+            <Alert color="red" icon={<IconAlertCircle size={16} />} radius="md"
+              withCloseButton onClose={() => setError(null)}>
+              {error}
+            </Alert>
+          )}
+
+          {/* Details Card */}
+          <Paper withBorder radius="md" p="lg">
+            <Table verticalSpacing="sm" horizontalSpacing="md">
+              <Table.Tbody>
+                <Table.Tr>
+                  <Table.Td w={180}>
+                    <Text size="sm" fw={600} c="dimmed">Name</Text>
+                  </Table.Td>
+                  <Table.Td>
+                    <Text size="sm">{role.displayName}</Text>
+                  </Table.Td>
+                </Table.Tr>
+                <Table.Tr>
+                  <Table.Td>
+                    <Text size="sm" fw={600} c="dimmed">Unique Name</Text>
+                  </Table.Td>
+                  <Table.Td>
+                    <Text size="sm" ff="monospace">{role.uniqueName}</Text>
+                  </Table.Td>
+                </Table.Tr>
+                <Table.Tr>
+                  <Table.Td>
+                    <Text size="sm" fw={600} c="dimmed">Beschreibung</Text>
+                  </Table.Td>
+                  <Table.Td>
+                    {role.description ? (
+                      <Text size="sm">{role.description}</Text>
+                    ) : (
+                      <Text size="sm" c="dimmed" fs="italic">Keine Beschreibung</Text>
+                    )}
+                  </Table.Td>
+                </Table.Tr>
+                <Table.Tr>
+                  <Table.Td>
+                    <Text size="sm" fw={600} c="dimmed">Status</Text>
+                  </Table.Td>
+                  <Table.Td>
+                    {isDeletable ? (
+                      <Badge color="gray" variant="light" size="sm">Nicht zugewiesen</Badge>
+                    ) : (
+                      <Badge color="primary" variant="light" size="sm">
+                        {role.assignedEmployeeCount} {role.assignedEmployeeCount === 1 ? "Mitarbeiter" : "Mitarbeitern"} zugewiesen
+                      </Badge>
+                    )}
+                  </Table.Td>
+                </Table.Tr>
+              </Table.Tbody>
+            </Table>
+
+            {/* Delete action — only when no employees assigned */}
+            {canManage && (
+              <Box mt="md" pt="md" style={{ borderTop: "1px solid var(--mantine-color-default-border)" }}>
+                {isDeletable ? (
+                  <Button
+                    size="xs"
+                    color="red"
+                    variant="subtle"
+                    radius="md"
+                    leftSection={<IconTrash size={13} />}
+                    onClick={openDeleteModal}
+                  >
+                    Rolle löschen
+                  </Button>
+                ) : (
+                  <Text size="xs" c="dimmed">
+                    Rolle kann nicht gelöscht werden, da sie noch {role.assignedEmployeeCount} {role.assignedEmployeeCount === 1 ? "Mitarbeiter" : "Mitarbeitern"} zugewiesen ist.
+                  </Text>
+                )}
+              </Box>
+            )}
+          </Paper>
+
+          {/* Permissions Card */}
+          <Paper withBorder radius="md" p="lg">
+            <Group mb="md" justify="space-between" align="center">
+              <Group gap="xs">
+                <ThemeIcon size="sm" variant="transparent" color="dimmed">
+                  <IconLock size={14} />
+                </ThemeIcon>
+                <Text size="xs" fw={600} c="dimmed" tt="uppercase" style={{ letterSpacing: 1 }}>
+                  Berechtigungen
+                </Text>
+                <Badge variant="light" color="primary" size="sm" radius="sm">
                   {role.permissions.length}
                 </Badge>
-              </Tabs.Tab>
-              <Tabs.Tab
-                value="employees"
-                leftSection={<IconUsers size={15} />}
-              >
-                Mitarbeiter zuweisen
-              </Tabs.Tab>
-            </Tabs.List>
+              </Group>
+              {canManage && (
+                <Button size="xs" variant="light" color="primary" radius="md"
+                  leftSection={<IconLock size={12} />} onClick={openPermModal}>
+                  Berechtigungen verwalten
+                </Button>
+              )}
+            </Group>
 
-            <Tabs.Panel value="permissions" pt="md">
-              <PermissionsTab
-                role={role}
-                allPermissions={allPermissions}
-                onSave={handleSavePermissions}
-              />
-            </Tabs.Panel>
+            {role.permissions.length === 0 ? (
+              <Text size="sm" c="dimmed" ta="center" py="md">Keine Berechtigungen zugewiesen</Text>
+            ) : (
+              <ScrollArea>
+                <Table striped highlightOnHover withTableBorder withColumnBorders verticalSpacing="sm" horizontalSpacing="sm">
+                  <Table.Thead>
+                    <Table.Tr>
+                      <Table.Th><Text size="xs" fw={600} c="dimmed" tt="uppercase" style={{ letterSpacing: 0.5 }}>Berechtigung</Text></Table.Th>
+                      <Table.Th><Text size="xs" fw={600} c="dimmed" tt="uppercase" style={{ letterSpacing: 0.5 }}>Scope</Text></Table.Th>
+                      {canManage && <Table.Th w={60} />}
+                    </Table.Tr>
+                  </Table.Thead>
+                  <Table.Tbody>
+                    {role.permissions.map((p) => (
+                      <Table.Tr
+                        key={p.id}
+                        style={{ cursor: "pointer", userSelect: "none" }}
+                        onClick={() => navigate(`/iam/permissions/${p.id}`)}
+                      >
+                        <Table.Td>
+                          <Box style={{ minWidth: 0 }}>
+                            <Text size="sm" fw={500} truncate>{p.resolvedLabel}</Text>
+                            <Text size="xs" c="dimmed" ff="monospace" truncate>{p.permissionKey}</Text>
+                          </Box>
+                        </Table.Td>
+                        <Table.Td>
+                          <Badge size="xs" variant="light" color={p.scope === "COMPANY" ? "secondary" : "primary"}>
+                            {p.scope === "COMPANY" ? "Company" : "Employee"}
+                          </Badge>
+                        </Table.Td>
+                        {canManage && (
+                          <Table.Td>
+                            <ActionIcon
+                              size="sm"
+                              color="red"
+                              variant="subtle"
+                              radius="md"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                const newIds = role.permissions
+                                  .filter((x) => x.id !== p.id)
+                                  .map((x) => x.id);
+                                setPermissions(role.uniqueName, newIds).then(load);
+                              }}
+                            >
+                              <IconX size={13} />
+                            </ActionIcon>
+                          </Table.Td>
+                        )}
+                      </Table.Tr>
+                    ))}
+                  </Table.Tbody>
+                </Table>
+              </ScrollArea>
+            )}
+          </Paper>
 
-            <Tabs.Panel value="employees" pt="md">
-              <EmployeesTab
-                role={role}
-                allEmployees={allEmployees}
-                onAssign={(id) => assignEmployee(role.uniqueName, id)}
-                onRemove={(id) => removeEmployee(role.uniqueName, id)}
-              />
-            </Tabs.Panel>
-          </Tabs>
+          {/* Employees Card */}
+          <Paper withBorder radius="md" p="lg">
+            <Group mb="md" justify="space-between" align="center">
+              <Group gap="xs">
+                <ThemeIcon size="sm" variant="transparent" color="dimmed">
+                  <IconUsers size={14} />
+                </ThemeIcon>
+                <Text size="xs" fw={600} c="dimmed" tt="uppercase" style={{ letterSpacing: 1 }}>
+                  Zugewiesene Mitarbeiter
+                </Text>
+                <Badge variant="light" color="primary" size="sm" radius="sm">
+                  {role.assignedEmployeeCount}
+                </Badge>
+              </Group>
+              {canManage && (
+                <Button size="xs" variant="light" color="primary" radius="md"
+                  leftSection={<IconUserPlus size={12} />} onClick={openAssignModal}>
+                  Mitarbeiter zuweisen
+                </Button>
+              )}
+            </Group>
+
+            {role.assignedEmployeeCount === 0 ? (
+              <Text size="sm" c="dimmed" ta="center" py="md">Kein Mitarbeiter hat diese Rolle</Text>
+            ) : (
+              <ScrollArea>
+                <Table striped highlightOnHover withTableBorder withColumnBorders verticalSpacing="sm" horizontalSpacing="sm">
+                  <Table.Thead>
+                    <Table.Tr>
+                      <Table.Th><Text size="xs" fw={600} c="dimmed" tt="uppercase" style={{ letterSpacing: 0.5 }}>Mitarbeiter</Text></Table.Th>
+                      <Table.Th><Text size="xs" fw={600} c="dimmed" tt="uppercase" style={{ letterSpacing: 0.5 }}>Personalnummer</Text></Table.Th>
+                      {canManage && <Table.Th w={60} />}
+                    </Table.Tr>
+                  </Table.Thead>
+                  <Table.Tbody>
+                    {assignedEmployees.map((emp) => (
+                      <Table.Tr key={emp.id} style={{ userSelect: "none" }}>
+                        <Table.Td>
+                          <Group gap="sm" wrap="nowrap">
+                            <ThemeIcon size={26} variant="light" color="primary" radius="sm" style={{ flexShrink: 0 }}>
+                              <Text size="xs" fw={700}>{emp.firstname[0]}{emp.surname[0]}</Text>
+                            </ThemeIcon>
+                            <Text size="sm" fw={500} truncate>{emp.firstname} {emp.surname}</Text>
+                          </Group>
+                        </Table.Td>
+                        <Table.Td>
+                          <Text size="sm" c="dimmed" ff="monospace">{emp.employeeNumber}</Text>
+                        </Table.Td>
+                        {canManage && (
+                          <Table.Td>
+                            <ActionIcon
+                              size="sm"
+                              color="red"
+                              variant="subtle"
+                              radius="md"
+                              loading={removingId === emp.id}
+                              onClick={() => handleRemoveEmployee(emp)}
+                            >
+                              <IconUserMinus size={13} />
+                            </ActionIcon>
+                          </Table.Td>
+                        )}
+                      </Table.Tr>
+                    ))}
+                  </Table.Tbody>
+                </Table>
+              </ScrollArea>
+            )}
+          </Paper>
 
         </Stack>
-      </Box>
+      </ModuleContentShell>
 
-      {/* ── Delete Modal ── */}
+      {/* Manage Permissions Modal */}
+      {role && (
+        <ManagePermissionsModal
+          opened={permModalOpened}
+          onClose={closePermModal}
+          role={role}
+          allPermissions={allPermissions}
+          onSaved={load}
+        />
+      )}
+
+      {/* Assign Employee Modal */}
+      {role && (
+        <AssignEmployeeModal
+          opened={assignModalOpened}
+          onClose={closeAssignModal}
+          role={role}
+          allEmployees={allEmployees}
+          assignedIds={assignedIds}
+          onAssigned={load}
+        />
+      )}
+
+      {/* Delete Confirm Modal */}
       <Modal
-        opened={deleteOpened}
-        onClose={closeDelete}
+        opened={deleteModalOpened}
+        onClose={closeDeleteModal}
         title={
           <Group gap="sm">
             <ThemeIcon color="red" variant="light" size="md" radius="md">
@@ -631,26 +812,16 @@ export function DetailRolePage() {
             <Text fw={600}>Rolle löschen</Text>
           </Group>
         }
-        centered
-        size="sm"
-        radius="md"
+        centered size="sm" radius="md"
       >
         <Stack gap="md">
           <Alert color="red" radius="md" icon={<IconAlertCircle size={16} />}>
             Die Rolle <strong>{role.displayName}</strong> wird unwiderruflich gelöscht.
-            Alle Zuweisungen an Mitarbeiter gehen dabei verloren.
           </Alert>
           <Group justify="flex-end">
-            <Button variant="light" color="secondary" radius="md" onClick={closeDelete}>
-              Abbrechen
-            </Button>
-            <Button
-              color="red"
-              radius="md"
-              loading={deleteLoading}
-              leftSection={<IconTrash size={16} />}
-              onClick={handleDeleteConfirm}
-            >
+            <Button variant="light" color="secondary" radius="md" onClick={closeDeleteModal}>Abbrechen</Button>
+            <Button color="red" radius="md" loading={deleteLoading}
+              leftSection={<IconTrash size={16} />} onClick={handleDeleteRole}>
               Endgültig löschen
             </Button>
           </Group>

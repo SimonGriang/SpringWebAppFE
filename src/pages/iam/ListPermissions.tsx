@@ -1,17 +1,16 @@
-import { useState, useEffect, useCallback, useContext } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Stack, Group, Box, Text, Title, TextInput, Paper,
-  ThemeIcon, Badge, Loader, Alert, Select,
+  ThemeIcon, Badge, Loader, Alert, Select, Button,
 } from "@mantine/core";
 import {
   IconLock, IconLockOff, IconChevronRight, IconAlertCircle,
-  IconSearch, IconBuilding, IconUser,
+  IconSearch, IconBuilding, IconUser, IconShieldOff, IconArrowLeft,
 } from "@tabler/icons-react";
-import { AuthContext } from "../../auth/AuthContext";
-import { createApiClient } from "../../api/apiClient";
+import { useApiClient } from "../../api/useApiClient";
+import { useAuth } from "../../auth/AuthContext";
 import { ModuleContentShell } from "../../components/layout/ModuleContentShell";
-
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -28,12 +27,11 @@ interface PermissionDTO {
 // ─── API Hook ─────────────────────────────────────────────────────────────────
 
 function usePermissionListApi() {
-  const { token } = useContext(AuthContext);
-  const api = createApiClient(() => token);
+  const api = useApiClient();
 
   const getPermissions = useCallback(
     (): Promise<PermissionDTO[]> => api("/backend/api/roles/permissions"),
-    [token]
+    [api]
   );
 
   return { getPermissions };
@@ -43,23 +41,11 @@ function usePermissionListApi() {
 
 export function ScopeBadge({ scope }: { scope: PermissionScope }) {
   return scope === "COMPANY" ? (
-    <Badge
-      color="secondary"
-      variant="light"
-      size="sm"
-      leftSection={<IconBuilding size={10} />}
-      style={{ flexShrink: 0 }}
-    >
+    <Badge color="secondary" variant="light" size="sm" leftSection={<IconBuilding size={10} />} style={{ flexShrink: 0 }}>
       Unternehmen
     </Badge>
   ) : (
-    <Badge
-      color="accent"
-      variant="light"
-      size="sm"
-      leftSection={<IconUser size={10} />}
-      style={{ flexShrink: 0 }}
-    >
+    <Badge color="primary" variant="light" size="sm" leftSection={<IconUser size={10} />} style={{ flexShrink: 0 }}>
       Mitarbeiter
     </Badge>
   );
@@ -67,24 +53,15 @@ export function ScopeBadge({ scope }: { scope: PermissionScope }) {
 
 // ─── Sub-Component: PermissionCard ───────────────────────────────────────────
 
-function PermissionCard({
-  permission,
-  onClick,
-}: {
-  permission: PermissionDTO;
-  onClick: () => void;
-}) {
+function PermissionCard({ permission, onClick }: { permission: PermissionDTO; onClick: () => void }) {
   const [hovered, setHovered] = useState(false);
 
   return (
     <Paper
-      withBorder
-      radius="md"
+      withBorder radius="md"
       style={{
         cursor: "pointer",
-        borderColor: hovered
-          ? "var(--mantine-color-secondary-4)"
-          : "var(--mantine-color-default-border)",
+        borderColor: hovered ? "var(--mantine-color-secondary-4)" : "var(--mantine-color-default-border)",
         transition: "border-color 0.15s, box-shadow 0.15s",
         boxShadow: hovered ? "0 2px 8px rgba(0,0,0,0.07)" : undefined,
       }}
@@ -93,36 +70,18 @@ function PermissionCard({
       onClick={onClick}
     >
       <Group p="md" justify="space-between" wrap="nowrap">
-        {/* Left */}
         <Group gap="md" wrap="nowrap" style={{ minWidth: 0, flex: 1 }}>
-          <ThemeIcon
-            size={36}
-            variant="light"
-            color={permission.scope === "COMPANY" ? "secondary" : "accent"}
-            radius="md"
-            style={{ flexShrink: 0 }}
-          >
+          <ThemeIcon size={36} variant="light" color={permission.scope === "COMPANY" ? "secondary" : "primary"} radius="md" style={{ flexShrink: 0 }}>
             <IconLock size={18} />
           </ThemeIcon>
           <Box style={{ minWidth: 0 }}>
             <Text fw={500} size="sm" truncate>{permission.resolvedLabel}</Text>
-            <Text size="xs" c="dimmed" ff="monospace" truncate>
-              {permission.permissionKey}
-            </Text>
+            <Text size="xs" c="dimmed" ff="monospace" truncate>{permission.permissionKey}</Text>
           </Box>
         </Group>
-
-        {/* Right */}
         <Group gap="xs" wrap="nowrap" style={{ flexShrink: 0 }}>
           <ScopeBadge scope={permission.scope} />
-          <IconChevronRight
-            size={15}
-            color="var(--mantine-color-dimmed)"
-            style={{
-              transition: "transform 0.15s",
-              transform: hovered ? "translateX(2px)" : "none",
-            }}
-          />
+          <IconChevronRight size={15} color="var(--mantine-color-dimmed)" style={{ transition: "transform 0.15s", transform: hovered ? "translateX(2px)" : "none" }} />
         </Group>
       </Group>
     </Paper>
@@ -133,31 +92,48 @@ function PermissionCard({
 
 export function PermissionListPage() {
   const navigate = useNavigate();
+  const { permissionProfile } = useAuth();
   const { getPermissions } = usePermissionListApi();
 
+  // All hooks must be declared before any conditional return (React rules of hooks)
   const [permissions, setPermissions] = useState<PermissionDTO[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [scopeFilter, setScopeFilter] = useState<string | null>(null);
 
-  // ── Laden ─────────────────────────────────────────────────────────────────
+  const canView =
+    permissionProfile?.companyPermissions.includes("ROLE_MANAGE") ||
+    permissionProfile?.companyPermissions.includes("ROLE_VIEW");
 
   useEffect(() => {
+    if (!canView) return;
     (async () => {
       setLoading(true);
       setError(null);
       try {
         setPermissions(await getPermissions());
       } catch (e: any) {
-        setError(e?.message ?? "Berechtigungen konnten nicht geladen werden");
+        setError(e?.message ?? "Permissions could not be loaded");
       } finally {
         setLoading(false);
       }
     })();
-  }, []);
+  }, [canView]);
 
-  // ── Filter ────────────────────────────────────────────────────────────────
+  // ── Permission guard ──────────────────────────────────────────────────────
+  if (!canView) {
+    return (
+      <Box p="xl" maw={580} mx="auto">
+        <Alert color="red" icon={<IconShieldOff size={18} />} radius="md" title="Keine Berechtigung">
+          Du hast keine Berechtigung, Berechtigungen einzusehen. Wende dich an einen Administrator.
+        </Alert>
+        <Button mt="md" variant="light" color="secondary" radius="md" leftSection={<IconArrowLeft size={16} />} onClick={() => navigate("/dashboard")}>
+          Zum Dashboard
+        </Button>
+      </Box>
+    );
+  }
 
   const filtered = permissions.filter((p) => {
     const matchesSearch =
@@ -170,14 +146,10 @@ export function PermissionListPage() {
   const companyPerms = filtered.filter((p) => p.scope === "COMPANY");
   const employeePerms = filtered.filter((p) => p.scope === "EMPLOYEE");
 
-  // ── Render ────────────────────────────────────────────────────────────────
-
   return (
-
     <ModuleContentShell>
       <Stack p="xl">
 
-        {/* Header */}
         <Group justify="space-between" align="flex-start" wrap="wrap" gap="sm">
           <Group gap="sm">
             <ThemeIcon size={40} variant="light" color="secondary" radius="md">
@@ -185,22 +157,17 @@ export function PermissionListPage() {
             </ThemeIcon>
             <Box>
               <Title order={3} fw={600}>Berechtigungen</Title>
-              <Text size="sm" c="dimmed">
-                {permissions.length} Berechtigungen im Unternehmen
-              </Text>
+              <Text size="sm" c="dimmed">{permissions.length} Berechtigungen im Unternehmen</Text>
             </Box>
           </Group>
         </Group>
 
-        {/* Error */}
         {error && (
-          <Alert color="red" icon={<IconAlertCircle size={16} />} radius="md"
-            withCloseButton onClose={() => setError(null)}>
+          <Alert color="red" icon={<IconAlertCircle size={16} />} radius="md" withCloseButton onClose={() => setError(null)}>
             {error}
           </Alert>
         )}
 
-        {/* Filter-Zeile */}
         <Group gap="sm" wrap="wrap">
           <TextInput
             placeholder="Berechtigungen durchsuchen..."
@@ -213,7 +180,7 @@ export function PermissionListPage() {
           <Select
             placeholder="Alle Scopes"
             data={[
-              { value: "COMPANY",  label: "Unternehmensweit" },
+              { value: "COMPANY", label: "Unternehmensweit" },
               { value: "EMPLOYEE", label: "Mitarbeiterbezogen" },
             ]}
             value={scopeFilter}
@@ -224,7 +191,6 @@ export function PermissionListPage() {
           />
         </Group>
 
-        {/* Content */}
         {loading ? (
           <Group justify="center" py="xl">
             <Loader size="sm" color="secondary" />
@@ -232,19 +198,14 @@ export function PermissionListPage() {
           </Group>
         ) : filtered.length === 0 ? (
           <Paper withBorder p="xl" ta="center" radius="md">
-            <ThemeIcon size={48} variant="light" color="gray" mx="auto" mb="sm">
-              <IconLockOff size={24} />
-            </ThemeIcon>
+            <ThemeIcon size={48} variant="light" color="gray" mx="auto" mb="sm"><IconLockOff size={24} /></ThemeIcon>
             <Text fw={500} mb={4}>Keine Berechtigungen gefunden</Text>
             <Text size="sm" c="dimmed">
-              {search || scopeFilter
-                ? "Versuche einen anderen Suchbegriff oder Filter"
-                : "Das System hat noch keine Berechtigungen generiert"}
+              {search || scopeFilter ? "Versuche einen anderen Suchbegriff oder Filter" : "Das System hat noch keine Berechtigungen generiert"}
             </Text>
           </Paper>
         ) : (
           <Stack gap="xl">
-            {/* Unternehmensweite Berechtigungen */}
             {companyPerms.length > 0 && (
               <Box>
                 <Group gap="xs" mb="sm">
@@ -255,17 +216,11 @@ export function PermissionListPage() {
                 </Group>
                 <Stack gap="xs">
                   {companyPerms.map((p) => (
-                    <PermissionCard
-                      key={p.id}
-                      permission={p}
-                      onClick={() => navigate(`/rollen/berechtigungen/${p.id}`)}
-                    />
+                    <PermissionCard key={p.id} permission={p} onClick={() => navigate(`/iam/permissions/${p.id}`)} />
                   ))}
                 </Stack>
               </Box>
             )}
-
-            {/* Mitarbeiterbezogene Berechtigungen */}
             {employeePerms.length > 0 && (
               <Box>
                 <Group gap="xs" mb="sm">
@@ -276,11 +231,7 @@ export function PermissionListPage() {
                 </Group>
                 <Stack gap="xs">
                   {employeePerms.map((p) => (
-                    <PermissionCard
-                      key={p.id}
-                      permission={p}
-                      onClick={() => navigate(`/rollen/berechtigungen/${p.id}`)}
-                    />
+                    <PermissionCard key={p.id} permission={p} onClick={() => navigate(`/iam/permissions/${p.id}`)} />
                   ))}
                 </Stack>
               </Box>

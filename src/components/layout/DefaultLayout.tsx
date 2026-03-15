@@ -32,6 +32,8 @@ const SCROLLBAR_STYLE = `
     overflow-y: auto;
     scrollbar-width: thin;
     scrollbar-color: var(--mantine-color-gray-4) transparent;
+    outline: none;
+    cursor: default;
   }
   .custom-scroll::-webkit-scrollbar { width: 5px; }
   .custom-scroll::-webkit-scrollbar-track { background: transparent; }
@@ -76,7 +78,10 @@ export const DefaultLayout: React.FC<{ children: React.ReactNode }> = ({ childre
         {/* Content + Panel nebeneinander */}
         <div style={{ display: "flex", flex: 1, minHeight: 0 }}>
 
-          <main className="custom-scroll" style={{ flex: 1, minWidth: 0, boxSizing: "border-box" }}>
+          <main
+            className="custom-scroll"
+            style={{ flex: 1, minWidth: 0, boxSizing: "border-box", outline: "none", cursor: "default" }}
+          >
             {children}
           </main>
 

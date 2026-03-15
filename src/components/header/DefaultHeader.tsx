@@ -42,6 +42,8 @@ import {
 import { useDisclosure } from "@mantine/hooks";
 import classes from "../stylings/HeaderStyling.module.css";
 import cx from "clsx";
+import { Link } from "react-router-dom";
+
 
 const mockdata = [
   { icon: IconCode,         title: "Open source",      description: "This Pokémon's cry is very loud and distracting" },
@@ -121,7 +123,9 @@ export const DefaultHeader = () => {
 
           {/* Desktop Navigation */}
           <Group h="100%" gap={0} visibleFrom="md">
-            <a href="#" className={classes.link} style={{ color: textColor }}>Home</a>
+            <Link to="/dashboard" className={classes.link} style={{ color: textColor }}>
+              Dashboard
+            </Link>
             <HoverCard width={600} position="bottom" radius="md" shadow="md" withinPortal>
               <HoverCard.Target>
                 <a href="#" className={classes.link}>

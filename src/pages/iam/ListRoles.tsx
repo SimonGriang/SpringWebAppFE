@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useContext } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Stack, Group, Box, Text, Title, Button, TextInput, Paper,
@@ -9,8 +9,7 @@ import {
   IconShield, IconShieldOff, IconPlus, IconTrash,
   IconChevronRight, IconAlertCircle, IconSearch, IconUsers,
 } from "@tabler/icons-react";
-import { AuthContext } from "../../auth/AuthContext";
-import { createApiClient } from "../../api/apiClient";
+import { useApiClient } from "../../api/useApiClient";
 import { ModuleContentShell } from "../../components/layout/ModuleContentShell";
 
 
@@ -31,18 +30,17 @@ interface RoleDto {
 // ─── API Hook ─────────────────────────────────────────────────────────────────
 
 function useRoleListApi() {
-  const { token } = useContext(AuthContext);
-  const api = createApiClient(() => token);
+  const api = useApiClient();
 
   const getRoles = useCallback(
     (): Promise<RoleDto[]> => api("/backend/api/roles"),
-    [token]
+    [api]
   );
 
   const deleteRole = useCallback(
     (roleName: string): Promise<void> =>
       api(`/backend/api/roles/${encodeURIComponent(roleName)}`, { method: "DELETE" }),
-    [token]
+    [api]
   );
 
   return { getRoles, deleteRole };
@@ -280,7 +278,7 @@ export function RoleManagementPage() {
                 <RoleCard
                   key={role.uniqueName}
                   role={role}
-                  onClick={() => navigate(`/rollen/${encodeURIComponent(role.uniqueName)}`)}
+                  onClick={() => navigate(`/iam/roles/${encodeURIComponent(role.uniqueName)}`)}
                   onDelete={() => { setDeleteTarget(role); openDelete(); }}
                 />
               ))}
