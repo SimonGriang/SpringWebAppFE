@@ -14,6 +14,7 @@ import { CreateRolePage } from "../pages/iam/CreateRole";
 import { DetailRolePage } from "../pages/iam/DetailsRole";
 import { PermissionListPage } from "../pages/iam/ListPermissions";
 import { DetailsPermissionPage } from "../pages/iam/DetailsPermission";
+import { ListEmployeesPage } from "../pages/iam/ListEmployees";
 
 // Returns true if the token exists and has not expired
 function isTokenValid(token: string | null): boolean {
@@ -85,7 +86,8 @@ export const Router = () => (
       <Route path="/iam/roles" element={<IAMRoute><RoleManagementPage /></IAMRoute>}/>
       <Route path="/iam/roles/create" element={<IAMRoute><CreateRolePage /></IAMRoute>}/>
       <Route path="/iam/roles/:roleName" element={<IAMRoute><DetailRolePage /></IAMRoute>}/>
-      <Route path="/iam/employees" element={<IAMRoute><DashboardPage /></IAMRoute>}/>
+      <Route path="/iam/employees" element={<IAMRoute><ListEmployeesPage /></IAMRoute>}/>
+      <Route path="/iam/employees/:employeeNumber" element={<IAMRoute><ListEmployeesPage /></IAMRoute>}/>
     </Routes>
   </BrowserRouter>
 );
